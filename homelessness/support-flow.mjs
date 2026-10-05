@@ -1,4 +1,4 @@
-import {questionsFor, preferencesFor} from './support-paths.mjs?v=20260930-1';
+import {questionsFor, preferencesFor} from './support-paths.mjs?v=20261005-1';
 
 const ntRegions = new Set(['darwin','katherine','alice','tennant','arnhem','topend','central','npy','unsure']);
 const contextRegions = new Set([...ntRegions]);
@@ -79,7 +79,7 @@ export function applyAnswer(topic, answers, questionId, value, savedRegion='') {
  const position=flow.questions.findIndex(item=>item.id===questionId);
  const resetFollowing=questionId==='need'||!owns(flow.answers,questionId);
  const changedPatient=topic==='care'&&questionId==='role';
- const localQualifications=new Set(['localCommunity','reliefCommunity','remoteArea','congressFit','wurliClient']);
+ const localQualifications=new Set(['localCommunity','reliefCommunity','remoteArea','congressFit','wurliClient','community']);
  for(const key of Object.keys(current)){
   if(key===questionId||key==='region'||key==='preferences')continue;
   const keyPosition=flow.questions.findIndex(item=>item.id===key);

@@ -1,7 +1,7 @@
-import {topics, questionsFor, preferencesFor, getResults, legacyRoute} from './support-paths.mjs?v=20260930-1';
-import {services,serviceView} from './support-catalog.mjs?v=20260930-1';
-import {getFlowState, applyAnswer} from './support-flow.mjs?v=20260930-1';
-import {handbookDirectory,handbookNeeds,handbookRegions,catalogueMetadata,handbookLinks} from './support-handbook.mjs?v=20260930-revised-1';
+import {topics, questionsFor, preferencesFor, getResults, recoveryResults, legacyRoute} from './support-paths.mjs?v=20261005-1';
+import {services,serviceView} from './support-catalog.mjs?v=20261005-1';
+import {getFlowState, applyAnswer} from './support-flow.mjs?v=20261005-1';
+import {handbookDirectory,handbookNeeds,handbookRegions,catalogueMetadata,handbookLinks} from './support-handbook.mjs?v=20261005-1';
 
 const root = document.getElementById('finder');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -45,24 +45,15 @@ function currentFlow() {
 }
 function showHome() {
   rememberAnswers();
-  root.innerHTML = `<h1 tabindex="-1">Find support in the NT</h1><p class="intro">Housing and homelessness support in the Northern Territory.</p><ul class="task-grid" aria-label="Choose the help you need">${topics.map(topic=>`<li><a class="task-link" href="#${topic.id}"><span><strong>${esc(topic.title)}</strong><small>${esc(topic.hint)}</small></span>${arrow}</a></li>`).join('')}</ul><p class="human-link"><a href="#help">Not sure where to start?</a></p><p class="human-link"><a href="#directory">Browse the full homelessness directory — ${catalogueMetadata.records} records across ${catalogueMetadata.needs} needs</a></p>`;
+  root.innerHTML = `<h1 tabindex="-1">NT housing & homelessness support</h1><p class="intro">For people without a safe or stable home, families and workers in the Northern Territory.</p><ul class="task-grid" aria-label="Choose the help you need">${topics.map(topic=>`<li><a class="task-link" href="#${topic.id}"><span><strong>${esc(topic.title)}</strong><small>${esc(topic.hint)}</small></span>${arrow}</a></li>`).join('')}</ul><p class="human-link"><a href="#help">Not sure where to start?</a></p><p class="human-link"><a href="#directory">Browse resource details — ${catalogueMetadata.routes} published routes across ${catalogueMetadata.needs} issues</a></p>`;
 }
 
 function directoryRegionalDetails(service) {
-  const regional=service.regions||[];
-  const chosen=directoryChoice.region ? regional.filter(r=>r.region===directoryChoice.region) : regional;
-  const names={darwin:['darwin','palmerston'],katherine:['katherine'],alice:['alice'],tennant:['tennant','barkly'],arnhem:['arnhem','nhulunbuy','gove'],topend:['top end'],central:['central'],npy:['npy']};
-  const contacts=(service.regionalContacts||[]).filter(c=>!directoryChoice.region||(names[directoryChoice.region]||[]).some(name=>String(c.region||c.name||c.area||'').toLowerCase().includes(name)));
-  const showAddress=!directoryChoice.region||service.raw?.regions?.length===1&&service.raw.regions[0]===directoryChoice.region;
-  return `<section class="directory-access"><h3>Regional access and contacts</h3>${chosen.map(r=>`<p><strong>${esc(r.label)}:</strong> ${r.service_available?'Published access route':'Matching local delivery not verified'}${r.channels?.length?` · ${esc(r.channels.map(v=>v.replace(/_/g,' ')).join(', '))}`:''}. ${esc(r.access_notes)}${r.local_delivery_confirmed?'':' A phone or online route does not confirm local appointments or a local office.'}</p>`).join('')}${contacts.length?`<ul>${contacts.map(c=>`<li><strong>${esc(c.name||c.region||c.area||'Regional contact')}</strong>${c.region&&c.name?` · ${esc(c.region)}`:''}${c.phone?` · ${link(telephone(c.phone),c.phone)}`:''}${c.alternate_phone?` · ${link(telephone(c.alternate_phone),c.alternate_phone)}`:''}${c.email?` · ${link('mailto:'+c.email,'Email')}`:''}${c.site||c.website?` · ${link(c.site||c.website,'Official regional contact')}`:''}${c.address?`<br>${esc(c.address)}`:''}</li>`).join('')}</ul>`:''}${showAddress&&service.address?`<p>${esc(service.address)}</p>`:''}${service.unavailableChannels?.length?`<p class="notice">Currently unavailable: ${esc(service.unavailableChannels.join(', '))}. Use the working contact route above.</p>`:''}</section>`;
-}
-function directoryServiceFor(service) {
-  if (!directoryChoice.region || !service.raw) return service;
   const region=directoryChoice.region;
-  const options=(service.raw.contact_options||[]).filter(option=>!option.regions?.length||option.regions.includes(region));
-  const view=serviceView({...service.raw,contact_options_visible:options,walkin_address:service.raw.regions?.length===1&&service.raw.regions[0]===region?service.raw.walkin_address:null});
-  return {...service,...view,regions:service.regions,regionalContacts:service.regionalContacts,raw:service.raw};
+  const matching=service.regions.filter(r=>!region||r.region===region);
+  return `<p class="quiet"><strong>Published catchment:</strong> ${esc(service.area).replace(/\n/g,'<br>')}. These are enquiry routes; local delivery and admission are assessed by the provider.</p>${service.issueNote?`<p class="notice">${esc(service.issueNote)}</p>`:''}`;
 }
+function directoryServiceFor(service) { return directoryChoice.region ? serviceView(service.raw,{region:directoryChoice.region}) : service; }
 function directoryCard(service,open=false) {
   const needNames=(service.needs||[]).map(id=>handbookNeeds.find(n=>n.id===id)?.title).filter(Boolean);
   const shown=directoryServiceFor(service);
@@ -70,16 +61,16 @@ function directoryCard(service,open=false) {
 }
 function refreshDirectory(selectedId='') {
   const items=handbookDirectory.filter(s=>(!directoryChoice.need||(s.needs||[]).includes(directoryChoice.need))&&(!directoryChoice.region||(s.regions||[]).some(r=>r.region===directoryChoice.region&&r.service_available)));
-  document.getElementById('directory-count').textContent=`Showing ${items.length} of ${catalogueMetadata.records} directory records. Region matches include published telephone or online access; they do not confirm local delivery, a bed or an appointment.`;
-  document.getElementById('directory-records').innerHTML=items.map(s=>directoryCard(s,s.id===selectedId)).join('')||'<p>No handbook record is verified for both filters. Choose a broader filter or use the support finder for a navigation contact.</p>';
+  document.getElementById('directory-count').textContent=`Showing ${items.length} of ${catalogueMetadata.records} issue-specific resource routes. Region matches include published telephone or online access; they do not confirm local delivery, a bed or an appointment.`;
+  document.getElementById('directory-records').innerHTML=items.map(s=>directoryCard(s,s.id===selectedId)).join('')||'<p>No resource route matches both filters. <a href="#directory" data-action="clear-filters">Clear filters</a> or <a href="#help">get help finding another service</a>.</p>';
 }
 function showDirectory(selectedId='') {
   rememberAnswers();
   const selected=handbookDirectory.find(s=>s.id===selectedId);
   if(selected){directoryChoice.need='';directoryChoice.region='';}
-  root.innerHTML=`<nav class="back-nav" aria-label="Support navigation"><a href="#home">All support topics</a>${state.topicId?`<a href="#${esc(state.topicId)}">Back to your support choices</a>`:''}</nav><h1 tabindex="-1">Full homelessness directory</h1><p class="intro">Choose a need, then a region to browse the reviewed records. The support finder gives a shorter first-contact route.</p><div class="directory-filters"><label for="directory-need">Need<select id="directory-need"><option value="">All ${catalogueMetadata.needs} needs</option>${handbookNeeds.map(n=>`<option value="${esc(n.id)}"${n.id===directoryChoice.need?' selected':''}>${esc(n.title)}</option>`).join('')}</select></label><label for="directory-region">Region<select id="directory-region"><option value="">All NT regions</option>${Object.entries(handbookRegions).map(([id,name])=>`<option value="${esc(id)}"${id===directoryChoice.region?' selected':''}>${esc(name)}</option>`).join('')}</select></label></div><p id="directory-count" class="directory-count" role="status" aria-live="polite"></p><div id="directory-records"></div><p class="quiet">Directory version ${esc(catalogueMetadata.version)} · source information checked ${esc(catalogueMetadata.verifiedDate)}. Each record links its official sources.</p>`;
+  root.innerHTML=`<nav class="back-nav" aria-label="Support navigation"><a href="#home">All support topics</a>${state.topicId?`<a href="#${esc(state.topicId)}">Back to your support choices</a>`:''}</nav><h1 tabindex="-1">Housing & homelessness resource details</h1><p class="intro">Choose a need, then a region to browse the reviewed records. The support finder gives a shorter first-contact route.</p><div class="directory-filters"><label for="directory-need">Need<select id="directory-need"><option value="">All ${catalogueMetadata.needs} issues</option>${handbookNeeds.map(n=>`<option value="${esc(n.id)}"${n.id===directoryChoice.need?' selected':''}>${esc(n.title)}</option>`).join('')}</select></label><label for="directory-region">Region<select id="directory-region"><option value="">All NT regions</option>${Object.entries(handbookRegions).map(([id,name])=>`<option value="${esc(id)}"${id===directoryChoice.region?' selected':''}>${esc(name)}</option>`).join('')}</select></label></div><p id="directory-count" class="directory-count" role="status" aria-live="polite"></p><div id="directory-records"></div><p class="quiet">Resource snapshot ${esc(catalogueMetadata.version)} · source information checked ${esc(catalogueMetadata.verifiedDate)}. Each record links its official sources.</p>`;
   refreshDirectory(selectedId);
-  document.title='Full homelessness directory | Lutheran Care';
+  document.title='Housing & homelessness resource details | Lutheran Care';
   if(selected)requestAnimationFrame(()=>{const record=document.getElementById('record-'+selected.id);record?.scrollIntoView({block:'start'});record?.querySelector('summary')?.focus({preventScroll:true});});
 }
 function safetyNotice(topic) {
@@ -133,9 +124,9 @@ function sourceDetails(service) {
   return `<details class="service-source"><summary>Information checked ${esc(date)}</summary><ul>${urls.map((url,index)=>`<li>${link(url,urls.length===1 ? 'Official source' : `Official source ${index+1}`)}</li>`).join('')}${records.map(id=>`<li>${link('#directory/'+id,'Service record, eligibility and regional access')}</li>`).join('')}</ul></details>`;
 }
 function serviceDetails(service, primary=false, beforeAction='', chats='', nextAction='') {
-  const qualification = `<p class="fit"><strong>Who it helps:</strong> ${esc(service.audience)}</p><p class="cost"><strong>Cost:</strong> ${esc(service.cost)}</p>`;
-  if (primary) return `<div class="result-layout"><section class="result-main"><h3 class="primary-service-heading">${esc(service.name)}</h3><p class="area">${esc(service.area)}</p><p class="offer">${esc(service.offer)}</p></section><aside class="contact-panel" aria-label="Contact ${esc(service.name)}">${beforeAction}${actionBlock(service,true)}${service.contactNotice ? `<p class="hours">${esc(service.contactNotice)}</p>` : ''}${service.hours ? `<p class="hours">${esc(service.hours)}</p>` : ''}${extraAction(service)}${nextAction}<div id="chat-options">${chats}</div></aside><div class="service-qualifications">${qualification}${service.access ? `<p class="access">${esc(service.access)}</p>` : ''}${sourceDetails(service)}</div></div>`;
-  return `<article class="alternative"><h3>${esc(service.name)}</h3><p class="area">${esc(service.area)}</p><p>${esc(service.offer)}</p><div class="alt-actions">${actionBlock(service,false)}</div>${service.contactNotice ? `<p class="quiet">${esc(service.contactNotice)}</p>` : ''}${service.hours ? `<p class="quiet">${esc(service.hours)}</p>` : ''}${qualification}${extraAction(service)}${service.access ? `<p class="access">${esc(service.access)}</p>` : ''}${sourceDetails(service)}</article>`;
+  const qualification = `<p class="fit"><strong>Published eligibility:</strong> ${esc(service.audience).replace(/\n/g,'<br>')}</p><p class="access"><strong>Access, fees and conditions:</strong> ${esc(service.access).replace(/\n/g,'<br>')}</p>`;
+  if (primary) return `<div class="result-layout"><section class="result-main"><h3 class="primary-service-heading">${esc(service.name)}</h3><p class="area">${esc(service.area)}</p><p class="offer">${esc(service.offer)}</p><p class="fit"><strong>Published eligibility:</strong> ${esc(service.audience).replace(/\n/g,'<br>')}</p></section><aside class="contact-panel" aria-label="Contact ${esc(service.name)}">${beforeAction}${actionBlock(service,true)}${service.contactNotice ? `<p class="hours">${esc(service.contactNotice)}</p>` : ''}${service.publishedContact ? `<p class="hours published-contact">${esc(service.publishedContact).replace(/\n/g,'<br>')}</p>` : ''}<p class="access">${esc(service.access).replace(/\n/g,'<br>')}</p>${extraAction(service)}${nextAction}<div id="chat-options">${chats}</div></aside><div class="service-qualifications">${sourceDetails(service)}</div></div>`;
+  return `<article class="alternative"><h3>${esc(service.name)}</h3><p class="area">${esc(service.area)}</p><p>${esc(service.offer)}</p><div class="alt-actions">${actionBlock(service,false)}</div>${service.contactNotice ? `<p class="quiet">${esc(service.contactNotice)}</p>` : ''}${service.publishedContact ? `<p class="quiet published-contact">${esc(service.publishedContact).replace(/\n/g,'<br>')}</p>` : ''}${qualification}${extraAction(service)}${sourceDetails(service)}</article>`;
 }
 function preferenceGroups(result) {
   const coreIds = new Set([...(result.ids || []), ...(result.moreIds || [])]);
@@ -156,12 +147,7 @@ function answerSummary(topicId, answers) {
 }
 
 function currentResults() {
-  const result = getResults(state.topicId,state.answers);
-  if (state.topicId!=='help' || !handoff) return result;
-  const alternatives = [...new Set([...(handoff.otherIds || []),'ask-izzy'])].filter(id=>services[id] && id!==handoff.previousPrimaryId);
-  const servicesById={...result.servicesById};
-  for(const id of alternatives) if(!servicesById[id]&&services[id]?.raw) servicesById[id]=serviceView(services[id].raw,{contactMode:result.contactMode});
-  return {...result,ids:alternatives.slice(0,3),moreIds:alternatives.slice(3),servicesById,note:'These options give you a different contact or a way to search local support.'};
+  return state.topicId==='help' && handoff ? recoveryResults(handoff,state.answers) : getResults(state.topicId,state.answers);
 }
 function resultsMarkup(topic) {
   const result = currentResults();
@@ -174,14 +160,14 @@ function resultsMarkup(topic) {
   const note = result.note || result.preferenceLink ? `<p class="notice">${esc(result.note).replace(/1800 737 732/g,'<a href="tel:1800737732">1800 737 732</a>').replace(/call 000/g,'call <a href="tel:000">000</a>')}${result.preferenceLink ? ` ${link(result.preferenceLink.href,result.preferenceLink.label)}` : ''}</p>` : '';
   const nextAction = ids.length>1 || more.length ? '<a class="another-contact" href="#other-contacts" data-page-jump="other-contacts">Try another contact</a>' : topic.id!=='help' ? '<a class="another-contact" href="#help" data-action="request-help">Help finding another service</a>' : '';
   const noteBefore = result.noteBefore || (topic.id==='safety' && state.answers.need==='violence-safety');
-  return `<div class="contacts-heading"><h2 id="support-contacts-heading">Your support contacts</h2><a href="#support-answers" data-page-jump="support-answers">Change your choices above</a></div><p class="context">${esc(summary)}</p><p class="quiet">${ids.length+more.length} suggested contacts for these choices, including ${more.length} in “More relevant services”. ${link('#directory','Browse all directory records')}</p>${serviceDetails(serviceFor(ids[0],result),true,noteBefore ? note : '',chatOptions(result,ids[0]),nextAction)}${!noteBefore ? note : ''}${say ? `<details class="say"><summary>What could I say when I contact them?</summary><p>“${esc(say)}”</p></details>` : ''}${ids.length>1 ? `<section class="alternate-list" id="other-contacts" tabindex="-1" aria-label="Other suitable options"><h2>Other ways to get help</h2>${ids.slice(1).map(id=>serviceDetails(serviceFor(id,result))).join('')}</section>` : ''}${more.length ? `<details class="more-services"${ids.length===1 ? ' id="other-contacts" tabindex="-1"' : ''}><summary>More relevant services (${more.length})</summary><div>${more.map(id=>serviceDetails(serviceFor(id,result))).join('')}</div></details>` : ''}${preferenceChoices(topic,result)}<div class="result-bottom">${topic.id!=='help' ? '<a href="#help" data-action="request-help">Find another way to get help</a>' : ''}<button class="text-button" data-action="print">Print these contacts</button></div>`;
+  return `<div class="contacts-heading"><h2 id="support-contacts-heading">Your support contacts</h2><a href="#support-answers" data-page-jump="support-answers">Change your choices above</a></div><p class="context">${esc(summary)}</p><p class="quiet">${ids.length+more.length} published enquiry contacts for these choices, including ${more.length} in “More enquiry routes”. ${link('#directory','Browse resource details')}</p>${serviceDetails(serviceFor(ids[0],result),true,noteBefore ? note : '',chatOptions(result,ids[0]),nextAction)}${!noteBefore ? note : ''}${say ? `<details class="say"><summary>What could I say when I contact them?</summary><p>“${esc(say)}”</p></details>` : ''}${ids.length>1 ? `<section class="alternate-list" id="other-contacts" tabindex="-1" aria-label="Other enquiry routes"><h2>Other ways to get help</h2>${ids.slice(1).map(id=>serviceDetails(serviceFor(id,result))).join('')}</section>` : ''}${more.length ? `<details class="more-services"${ids.length===1 ? ' id="other-contacts" tabindex="-1"' : ''}><summary>More enquiry routes (${more.length})</summary><div>${more.map(id=>serviceDetails(serviceFor(id,result))).join('')}</div></details>` : ''}${preferenceChoices(topic,result)}<div class="result-bottom">${topic.id!=='help' ? '<a href="#help" data-action="request-help">Find another way to get help</a>' : ''}<button class="text-button" data-action="print">Print these contacts</button></div>`;
 }
 function showFlow(topic) {
   const flow = currentFlow();
   const returnLink = topic.id==='help' && handoff ? `<a href="#${handoff.topicId}" data-action="return-to-request">Back to your original contacts</a>` : '';
   const context = topic.id==='help' && handoff ? `<p class="handoff-context"><strong>Help finding another service:</strong> ${esc(handoff.summary)}</p>` : '';
   root.innerHTML = `<nav class="back-nav" aria-label="Support navigation"><a href="#home">All support topics</a>${returnLink}</nav><h1 tabindex="-1">${esc(topic.id==='help' && handoff ? 'Help finding another service' : topic.title)}</h1>${context}<div id="flow-safety">${safetyNotice(topic)}</div><div id="support-answers" tabindex="-1"><form id="support-flow" aria-label="Your support choices" novalidate><div id="flow-questions">${flow.visibleQuestions.map(questionMarkup).join('')}</div></form></div><p id="flow-status" class="sr-only" role="status" aria-live="polite"></p><div id="flow-related">${relatedMarkup(topic)}</div><section id="support-contacts" class="flow-results" aria-labelledby="support-contacts-heading" tabindex="-1"${flow.complete ? '' : ' hidden'}>${flow.complete ? resultsMarkup(topic) : ''}</section>`;
-  document.title = `${topic.title} | Lutheran Care`;
+  document.title = `${topic.title} | NT housing & homelessness support | Lutheran Care`;
 }
 function syncFlow(topic) {
   const flow = currentFlow();
@@ -228,7 +214,7 @@ function render() {
   }
   if (!topic) {
     showHome();
-    document.title = 'Find support in the NT | Lutheran Care';
+    document.title = 'NT housing & homelessness support | Lutheran Care';
   } else {
     initialiseTopic(topic.id,seededNeed);
     // Old question/result links still open the appropriate topic. Answers are
@@ -267,6 +253,7 @@ root.addEventListener('submit', event => {
 });
 root.addEventListener('click', event => {
   if (event.target.closest('[data-action="print"]')) window.print();
+  if(event.target.closest('[data-action="clear-filters"]')){event.preventDefault();directoryChoice.need='';directoryChoice.region='';showDirectory();return;}
   const anchor = event.target.closest('a[href^="#"]');
   if (!anchor || anchor.dataset.pageJump) return;
   if (anchor.dataset.action==='request-help' && state.topicId!=='help') {
