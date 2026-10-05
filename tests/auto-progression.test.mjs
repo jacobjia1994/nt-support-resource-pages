@@ -26,7 +26,7 @@ function renderer(site,globals) {
     matches() { return false; }
   };
   for(const id of ['main','urgent-help','preference-status','preference-results','chat-options'])target(id);
-  pageTargets['preference-results'].querySelectorAll=()=>[...pageTargets['preference-results'].innerHTML.matchAll(/class="alternative"/g)];
+  pageTargets['preference-results'].querySelectorAll=()=>[...pageTargets['preference-results'].innerHTML.matchAll(/class="[^"]*\balternative\b[^"]*"/g)];
   let html='', field=null, next=null, selectedPreferences=[];
   const root = {
     get innerHTML() { return html; },
@@ -183,7 +183,7 @@ function renderer(site,globals) {
 const plans={
  homelessness:{
   food:'#task/food-washing/0',foodNeed:'food-essentials',
-  multistep:'#task/tonight',steps:[['age','25-49'],['household','single-man'],['region','darwin']],
+  multistep:'#task/tonight',steps:[['region','darwin'],['age','25-49'],['household','single-man']],
   named:'#health/health-wellbeing',namedSteps:[['age','25-49'],['region','darwin']],
   other:'#task/medical/0',recoveryRegion:'darwin'
  },
@@ -208,8 +208,9 @@ for(const site of ['homelessness','defence']){
    ui.dispatchChange(oldControl);
    assert.equal(ui.historySize(),beforeHistory+1,'A detached old control cannot double advance');
    if(index<plan.steps.length-1){assert.equal(ui.question(),plan.steps[index+1][0]);assert.equal(ui.focus(),'question-heading');}
-   else{assert.equal(ui.question(),undefined);assert.equal(ui.focus(),'contacts-heading');assert.match(ui.root.innerHTML,/Your support contacts/);}
+   else{assert.equal(ui.question(),undefined);assert.equal(ui.focus(),'contacts-heading');assert.match(ui.root.innerHTML,/Contact a service/);}
    assert.doesNotMatch(ui.root.innerHTML,/id="flow-next"|type="submit"/);
+   assert.ok((ui.root.innerHTML.match(/id="chat-options"/g)||[]).length<=1,'Contact cards never duplicate the primary chat target');
   }
  });
  test(site+': Back replays the same checked answer by click and Forward restores results',()=>{
@@ -298,4 +299,18 @@ test('defence: changing patient role clears former treatment answers and asks th
  assert.equal(ui.run('state.answers.dvaTravel'),undefined);assert.equal(ui.question(),'region');
  ui.choose('region','alice');ui.edit('role');ui.choose('role','other');
  assert.equal(ui.question(),'dvaTravel');assert.doesNotMatch(ui.root.innerHTML,/class="primary-service-heading"/);
+});
+
+for(const site of ['homelessness','defence'])test(site+': unavailable route recovers without showing a fabricated contact',()=>{
+ const ui=renderer(site,{...globals[site],getResults:()=>({ids:[]})}),plan=plans[site];
+ ui.navigate(plan.food);ui.choose('region',plan.recoveryRegion);
+ assert.match(ui.root.innerHTML,/There is no matched contact|No service matches/);
+ assert.doesNotMatch(ui.root.innerHTML,/class="primary-service-heading"/);
+ ui.click('request-help','#help');
+ assert.equal(ui.run('handoff.answers.need'),plan.foodNeed);
+ assert.equal(ui.run('handoff.answers.region'),plan.recoveryRegion);
+ if(site==='defence')ui.choose('connection','former');
+ assert.equal(ui.question(),undefined);
+ assert.ok(ui.run('currentResults().ids.length')>0,'Recovery provides a real published navigation service');
+ assert.doesNotMatch(ui.root.innerHTML,/data-action="request-help"/,'Recovery avoids a loop');
 });

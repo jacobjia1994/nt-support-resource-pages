@@ -179,8 +179,8 @@ test('irrelevant age and location questions are skipped; essential fit remains',
   assert(!questionsFor(topic,a).some(q=>['region','community'].includes(q.id)));
   assert(!result(topic,a).noDirectMatch);
  }
- assert(questionsFor('housing',{need:'safe-tonight'}).some(q=>q.id==='age'));
- assert(questionsFor('housing',{need:'safe-tonight'}).some(q=>q.id==='household'));
+ assert(questionsFor('housing',{need:'safe-tonight',region:'darwin'}).some(q=>q.id==='age'));
+ assert(questionsFor('housing',{need:'safe-tonight',region:'darwin'}).some(q=>q.id==='household'));
  assert(questionsFor('family',{need:'children-youth-family',familyNeed:'housing'}).some(q=>q.id==='age'));
 });
 
@@ -200,4 +200,106 @@ test('ID, interpreter and transport tasks lead to the precise published route',(
  for(const [languageNeed,expected]of [['aboriginal','nt-aboriginal-interpreter-service'],['other-language','tis-national'],['relay','national-relay']])assert.deepEqual(catalogues(result('access',{need:'access-culture-disability',accessNeed:'language',languageNeed})),[expected]);
  assert.deepEqual(catalogues(result('access',{need:'access-culture-disability',accessNeed:'transport',transportNeed:'bus',region:'darwin'})),['nt-free-public-buses']);
  assert.deepEqual(catalogues(result('access',{need:'access-culture-disability',accessNeed:'transport',transportNeed:'community',region:'katherine'})),['kalano-katherine-community-transport']);
+});
+
+test('tonight asks region first and retains only route-changing fit questions',()=>{
+ const seed={need:'safe-tonight'};
+ assert.equal(getFlowState('housing',seed).nextQuestion.id,'region');
+ const ageValues=['under15','15-18','19-21','22-24','25-49','50-64','65+','unsure'];
+ const householdValues=['single-man','single','couple','family','unsure'];
+ const signature=r=>r.allIds.map(id=>[id,r.servicesById[id].contactNotice]);
+ for(const region of ['unsure','tennant','arnhem','topend','central','npy']){
+  const flow=getFlowState('housing',{...seed,region});assert(flow.complete,region);
+  assert.deepEqual(flow.questions.map(q=>q.id),['need','region']);
+  const basic=signature(result('housing',flow.answers));
+  for(const age of ageValues)for(const household of householdValues)assert.deepEqual(signature(result('housing',{...seed,region,age,household})),basic);
+ }
+ for(const region of ['darwin','katherine']){
+  assert.equal(getFlowState('housing',{...seed,region}).nextQuestion.id,'age');
+  const young=getFlowState('housing',{...seed,region,age:'under15'});assert(young.complete);
+  assert(!young.questions.some(q=>q.id==='household'));
+  for(const household of householdValues)assert.deepEqual(signature(result('housing',{...young.answers,household})),signature(result('housing',young.answers)));
+  assert.equal(getFlowState('housing',{...seed,region,age:'25-49'}).nextQuestion.id,'household');
+ }
+ assert.equal(getFlowState('housing',{...seed,region:'alice'}).nextQuestion.id,'household');
+ for(const household of ['single','couple','family','unsure']){
+  const flow=getFlowState('housing',{...seed,region:'alice',household});assert(flow.complete);
+  assert(!flow.questions.some(q=>q.id==='age'));
+  for(const age of ageValues)assert.deepEqual(signature(result('housing',{...flow.answers,age})),signature(result('housing',flow.answers)));
+ }
+ assert.equal(getFlowState('housing',{...seed,region:'alice',household:'single-man'}).nextQuestion.id,'age');
+ assert(!catalogues(result('housing',{...seed,region:'alice',household:'single-man',age:'under15'})).includes('salvos-todd-street-men'));
+ assert(catalogues(result('housing',{...seed,region:'alice',household:'single-man',age:'25-49'})).includes('salvos-todd-street-men'));
+ const moved=applyAnswer('housing',{...seed,region:'darwin',age:'25-49',household:'family'},'region','tennant','darwin');
+ assert(moved.complete);assert(!('age'in moved.answers));assert(!('household'in moved.answers));
+});
+
+test('family and couple housing notes name the relevant units without changing published details',()=>{
+ for(const [region,catalogue,units,hostels]of [['darwin','vinnies-darwin-housing','Ted Collins','Bakhita/Park Lodge'],['katherine','vinnies-katherine-housing','Bernard Complex','Ormonde House']])for(const household of ['family','couple']){
+  const r=result('housing',{need:'safe-tonight',region,age:'25-49',household});
+  if(household==='family')assert.equal(services[r.ids[0]].catalogueId,catalogue);
+  const card=r.servicesById[r.allIds.find(id=>services[id].catalogueId===catalogue)];
+  assert(card.fitNote.includes(units));assert(card.fitNote.includes(hostels));assert(card.fitNote.includes('up to two people per room'));
+  assert.equal(card.audience,card.raw.display.who);assert.equal(card.offer,card.raw.display.help);assert.equal(card.access,card.raw.display.access);
+  assert.doesNotMatch(card.fitNote,/available|vacancy|accepted|guaranteed/);
+ }
+});
+
+test('online access leads with an exact local library route before the search directory',()=>{
+ const expected={darwin:['darwin-library-digital','palmerston-library-digital','ask-izzy'],tennant:['tennant-library-digital','ask-izzy'],alice:['alice-library-digital','ask-izzy']};
+ for(const [region,ids]of Object.entries(expected))assert.deepEqual(catalogues(result('essentials',{need:'identity-digital',digitalNeed:'online',region})),ids);
+ for(const region of ['unsure','katherine','arnhem','topend','central','npy'])assert.deepEqual(catalogues(result('essentials',{need:'identity-digital',digitalNeed:'online',region})),['ask-izzy']);
+});
+
+test('food leads with actual local day services and qualifies the Alice Vinnies enquiry',()=>{
+ const food=region=>result('essentials',{need:'food-essentials',essentialNeed:'food',region});
+ const expected={darwin:['vinnies-ozanam-house','vinnies-nt-emergency-relief','catholiccare-emergency-relief','foodbank-darwin-hub','baptist-food-for-life'],katherine:['salvos-katherine-doorways-hub','catholiccare-emergency-relief'],tennant:['catholiccare-emergency-relief'],alice:['salvos-waterhole','lc-alice-emergency-relief','vinnies-nt-emergency-relief']};
+ for(const [region,ids]of Object.entries(expected))assert.deepEqual(catalogues(food(region)),ids);
+ for(const region of ['unsure','arnhem','topend','central','npy']){
+  const r=food(region);assert(r.noDirectMatch);assert.deepEqual(catalogues(r),['ask-izzy']);
+ }
+ const alice=food('alice'),aliceVinnies=alice.servicesById[alice.allIds.find(id=>services[id].catalogueId==='vinnies-nt-emergency-relief')];
+ assert.match(aliceVinnies.fitNote,/Alice Springs, ask about sessions and venue/);
+ assert.match(aliceVinnies.fitNote,/Malak\/Palmerston hours are for Darwin\/Palmerston/);
+ assert.equal(aliceVinnies.access,aliceVinnies.raw.display.access);
+ assert.equal(aliceVinnies.audience,aliceVinnies.raw.display.who);
+ assert.equal(aliceVinnies.publishedContact,aliceVinnies.raw.display.contact);
+ assert(aliceVinnies.contactOptions.some(o=>o.href==='tel:131812'));
+ const darwin=food('darwin'),darwinVinnies=darwin.servicesById[darwin.allIds.find(id=>services[id].catalogueId==='vinnies-nt-emergency-relief')];
+ assert.equal(darwinVinnies.fitNote,'');assert.equal(darwinVinnies.access,aliceVinnies.access);
+ const barkly=food('tennant'),barklyCard=barkly.servicesById[barkly.ids[0]];
+ assert.deepEqual(barklyCard.contactOptions.filter(o=>o.channel==='phone').map(o=>o.href),['tel:0889623065']);
+ const recover=recoveryResults({topicId:'essentials',answers:{need:'food-essentials',essentialNeed:'food',region:'alice'},previousPrimaryId:alice.ids[0]});
+ const recoveredVinnies=recover.allIds.find(id=>services[id].catalogueId==='vinnies-nt-emergency-relief');
+ assert.equal(recover.servicesById[recoveredVinnies].fitNote,aliceVinnies.fitNote);
+});
+
+test('remote laundry enquiries use the exact community list and national contact only',()=>{
+ const source=rows.find(row=>row.catalogue_id==='orange-sky-top-end');
+ assert.deepEqual(source.geography,{rank:1,group:'Darwin'});
+ assert.equal(source.display.location,'Darwin /\nnamed remote communities');
+ assert.equal(source.display.help,'Free laundry; Darwin also has showers. Remote services do not all provide showers.');
+ const access='Check official shift locator/local partner. Remote laundry includes Bulla, Gapuwiyak, Kalkaringi/Daguragu, Maningrida, Nganmarriyanga, Nitjpurru, Wadeye, Wurrumiyanga and Yarralin.';
+ assert.equal(source.display.access,access);
+ for(const region of ['katherine','arnhem','topend']){
+  const a={need:'food-essentials',essentialNeed:'washing',region},r=result('essentials',a);
+  assert(catalogues(r).includes('orange-sky-top-end'));
+  if(region==='katherine')assert.equal(services[r.ids[0]].catalogueId,'salvos-katherine-doorways-hub');
+  const card=r.servicesById[source.appearance_id];
+  assert.equal(card.access,access);assert.equal(card.offer,source.display.help);assert.equal(card.publishedContact,source.display.contact);
+  assert.match(card.fitNote,/listed laundry communities/);assert.match(card.fitNote,/confirm your local shift and whether showers are offered/);
+  assert.deepEqual(card.contactOptions.filter(o=>o.channel==='phone').map(o=>o.href),['tel:0730675800']);
+  assert(!card.contactOptions.some(o=>o.href==='tel:0889795772'));
+  const noPhone=result('essentials',{...a,preferences:['no-phone']}).servicesById[source.appearance_id];
+  assert(!noPhone.contactOptions.some(o=>['phone','text'].includes(o.channel)));
+  assert.equal(noPhone.access,access);
+ }
+ for(const region of ['unsure','tennant','central','npy']){
+  const r=result('essentials',{need:'food-essentials',essentialNeed:'washing',region});
+  assert(r.noDirectMatch);assert.deepEqual(catalogues(r),['ask-izzy']);
+ }
+ for(const region of ['katherine','arnhem','topend'])assert(!catalogues(result('essentials',{need:'food-essentials',essentialNeed:'food',region})).includes('orange-sky-top-end'));
+ const darwin=result('essentials',{need:'food-essentials',essentialNeed:'washing',region:'darwin'}).servicesById[source.appearance_id];
+ assert.equal(darwin.fitNote,'');assert.equal(darwin.offer,source.display.help);
+ assert.deepEqual(darwin.contactOptions.filter(o=>o.channel==='phone').map(o=>o.href),['tel:0730675800']);
 });
