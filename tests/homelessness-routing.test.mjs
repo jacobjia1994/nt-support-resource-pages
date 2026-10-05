@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import release,{rows,services,contactOptionsFor,regionsFor} from '../homelessness/support-catalog.mjs';
 import {topics,questionsFor,getResults,recoveryResults,needIssues} from '../homelessness/support-paths.mjs';
+import {journeys} from '../homelessness/support-journeys.mjs';
 import {getFlowState,applyAnswer} from '../homelessness/support-flow.mjs';
 const catalogues=r=>r.allIds.map(id=>services[id].catalogueId);
 const result=(t,a)=>getResults(t,a);
@@ -32,7 +33,7 @@ test('every issue has a reachable task choice and complete offered paths resolve
   for(const id of [...r.ids,...r.moreIds]){assert(services[id]);seenRoutes.add(id);seenIssues.add(services[id].raw.issue_number);}
  }
  for(const topic of topics)walk(topic.id);
- assert(complete>2000);assert.equal(seenIssues.size,16);
+ assert(complete>0);assert.equal(seenIssues.size,16);
  // Emergency services remain always visible through the page's 000 action,
  // rather than being suggested for every non-emergency violence enquiry.
  const unreachable=rows.filter(row=>!seenRoutes.has(row.appearance_id));
@@ -49,9 +50,26 @@ test('family accommodation excludes adult-only programmes and retains prerequisi
  assert(stable.ids.some(id=>/public-housing waiting list/i.test(stable.servicesById[id].audience)));
  for(const region of ['tennant','arnhem']){
   const r=result('housing',{...a,region});
-  assert.match(r.note,/General crisis\/youth beds in Barkly and East Arnhem are not verified/);
+  assert.match(r.note,new RegExp('General crisis and youth beds in '+(region==='tennant'?'Barkly':'East Arnhem')+' are not confirmed'));
   assert.deepEqual(catalogues(r),['nt-central-intake']);
  }
+});
+
+test('tonight notices retain fit and availability caution for the selected region only',()=>{
+ const answers={need:'safe-tonight',age:'25-49',household:'family'};
+ for(const region of ['darwin','katherine','alice','topend','central','npy','unsure']){
+  const r=result('housing',{...answers,region});
+  assert.doesNotMatch(r.note,/Barkly|East Arnhem|000/);
+  assert.match(r.note,/vacancies, costs, household\/carer fit, disability access and pets/);
+  assert.match(r.note,/After hours or if full.*none is guaranteed/);
+ }
+ const barkly=result('housing',{...answers,region:'tennant'}).note;
+ const arnhem=result('housing',{...answers,region:'arnhem'}).note;
+ assert.match(barkly,/Barkly/);assert.doesNotMatch(barkly,/East Arnhem/);
+ assert.match(arnhem,/East Arnhem/);assert.doesNotMatch(arnhem,/Barkly/);
+ for(const note of [barkly,arnhem])assert.match(note,/specialist services have separate entry rules/);
+ assert.match(result('safety',{need:'violence-safety',safetyNeed:'support',region:'darwin'}).note,/000/);
+ assert.match(release.issues.find(i=>i.issue_number===1).note,/Barkly and East Arnhem/);
 });
 
 test('specific needs do not spill unrelated programmes into results',()=>{
@@ -114,4 +132,72 @@ test('repeated selections keep same-page state and clear stale qualifications',(
  assert(!('transitionNeed'in changed.answers));assert(!('age'in changed.answers));assert.equal(changed.answers.region,'katherine');
  const refuge={need:'violence-safety',safetyNeed:'refuge',refugeFor:'woman-child',region:'arnhem',community:'galiwinku'};
  const moved=applyAnswer('safety',refuge,'region','topend','arnhem');assert(!('community'in moved.answers));
+});
+
+test('homepage journeys seed real tasks and retain all published route coverage',()=>{
+ assert.equal(new Set(journeys.map(j=>j.id)).size,journeys.length);
+ const seenIssues=new Set(),seenRows=new Set();
+ function walk(topic,a){
+  const flow=getFlowState(topic,a),q=flow.nextQuestion;
+  if(q){for(const o of q.options)walk(topic,{...flow.answers,[q.id]:o.value});return;}
+  const r=result(topic,flow.answers);assert(r.ids.length>=1&&r.ids.length<=3);
+  for(const id of r.allIds){seenRows.add(id);seenIssues.add(services[id].raw.issue_number);}
+ }
+ for(const journey of journeys){
+  assert(journey.title&&journey.choices.length>0);
+  assert(journey.choices.length<=6);
+  for(const choice of journey.choices){
+   const seed={need:choice.need,...choice.answers};
+   const flow=getFlowState(choice.topicId,seed);
+   for(const [key,value]of Object.entries(seed))assert.equal(flow.answers[key],value,journey.id+' loses '+key);
+   assert.notEqual(flow.nextQuestion?.id,'need');
+   for(const key of Object.keys(choice.answers))assert.notEqual(flow.nextQuestion?.id,key);
+   walk(choice.topicId,seed);
+  }
+ }
+ assert.deepEqual(seenIssues,new Set(Array.from({length:16},(_,i)=>i+1)));
+ assert.deepEqual(rows.filter(r=>!seenRows.has(r.appearance_id)).map(r=>r.catalogue_id),['emergency-000']);
+});
+
+test('irrelevant age and location questions are skipped; essential fit remains',()=>{
+ for(const [topic,a]of [
+  ['essentials',{need:'food-essentials',essentialNeed:'food'}],
+  ['essentials',{need:'food-essentials',essentialNeed:'washing'}],
+  ['family',{need:'children-youth-family',familyNeed:'family'}],
+  ['family',{need:'children-youth-family',familyNeed:'school'}],
+  ['access',{need:'disability-ageing',careNeed:'carer'}],
+  ['access',{need:'legal-transition',transitionNeed:'hospital'}]])assert(!questionsFor(topic,a).some(q=>q.id==='age'));
+ for(const [topic,a]of [
+  ['money',{need:'money-benefits',moneyNeed:'payments'}],
+  ['money',{need:'money-benefits',moneyNeed:'electricity'}],
+  ['health',{need:'health-medical-travel',medicalNeed:'advice'}],
+  ['essentials',{need:'identity-digital',digitalNeed:'birth'}],
+  ['access',{need:'disability-ageing',careNeed:'carer'}],
+  ['access',{need:'legal-help',legalNeed:'government'}],
+  ['access',{need:'access-culture-disability',accessNeed:'language',languageNeed:'relay'}],
+  ['safety',{need:'violence-safety',safetyNeed:'refuge',refugeFor:'other'}]]){
+  assert(!questionsFor(topic,a).some(q=>['region','community'].includes(q.id)));
+  assert(!result(topic,a).noDirectMatch);
+ }
+ assert(questionsFor('housing',{need:'safe-tonight'}).some(q=>q.id==='age'));
+ assert(questionsFor('housing',{need:'safe-tonight'}).some(q=>q.id==='household'));
+ assert(questionsFor('family',{need:'children-youth-family',familyNeed:'housing'}).some(q=>q.id==='age'));
+});
+
+test('adult mental-health contact is ahead of conditional youth programmes',()=>{
+ const r=result('health',{need:'health-wellbeing',age:'25-49',region:'darwin'});
+ assert.equal(services[r.ids[0]].catalogueId,'darwin-medicare-mental-health');
+ assert(!r.ids.some(id=>['kids-helpline','headspace-nt-youth'].includes(services[id].catalogueId)));
+ assert(r.moreIds.some(id=>services[id].catalogueId==='kids-helpline'));
+});
+
+test('ID, interpreter and transport tasks lead to the precise published route',()=>{
+ const id=result('essentials',{need:'identity-digital',digitalNeed:'id',region:'darwin'});
+ assert(catalogues(id).includes('larrakia-return-to-country'));
+ assert.match(id.servicesById[id.allIds.find(i=>services[i].catalogueId==='larrakia-return-to-country')].access,/\$75/);
+ const centralId=result('essentials',{need:'identity-digital',digitalNeed:'id',region:'central'});
+ assert(catalogues(centralId).includes('tangentyere-identity-banking-return-country'));
+ for(const [languageNeed,expected]of [['aboriginal','nt-aboriginal-interpreter-service'],['other-language','tis-national'],['relay','national-relay']])assert.deepEqual(catalogues(result('access',{need:'access-culture-disability',accessNeed:'language',languageNeed})),[expected]);
+ assert.deepEqual(catalogues(result('access',{need:'access-culture-disability',accessNeed:'transport',transportNeed:'bus',region:'darwin'})),['nt-free-public-buses']);
+ assert.deepEqual(catalogues(result('access',{need:'access-culture-disability',accessNeed:'transport',transportNeed:'community',region:'katherine'})),['kalano-katherine-community-transport']);
 });

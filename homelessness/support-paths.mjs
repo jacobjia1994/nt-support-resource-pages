@@ -26,7 +26,7 @@ const subquestions={
  'children-youth-family':question('familyNeed','What would help?',[['family','Family or parenting support'],['housing','Youth housing or risk of leaving home'],['young-parent','A young pregnant woman or young mum'],['school','School enrolment or attendance'],['safety','Concern about harm to a child']]),
  'food-essentials':question('essentialNeed','What is needed?',[['food','Food, vouchers or everyday essentials'],['washing','Showers or laundry'],['youth','Emergency relief for a young person']]),
  'money-benefits':question('moneyNeed','What would help?',[['payments','Payments or social-work help'],['debt','Debt or financial counselling'],['electricity','Electricity bills or prepaid credit'],['bond','Private-rental bond or advance rent'],['concessions','NT concessions']]),
- 'identity-digital':question('digitalNeed','What is needed?',[['id','A birth certificate or ID help'],['online','Computers, internet or help applying'],['find','Find a local service']]),
+ 'identity-digital':question('digitalNeed','What is needed?',[['birth','A birth certificate'],['id','Help getting ID or documents'],['online','Computers, internet or help applying'],['find','Find a local service']]),
  'health-medical-travel':question('medicalNeed','What would help?',[['advice','Health advice for anyone'],['clinic','An Aboriginal community health clinic'],['travel','Travel for specialist treatment'],['renal','Practical support for an Aboriginal renal patient']]),
  'alcohol-drugs':question('aodNeed','What kind of help?',[['advice','Advice, counselling or treatment entry'],['residential','Residential treatment / rehabilitation'],['withdrawal','Withdrawal assessment'],['sobering','Supported sobering care'],['harm','Harm reduction or blood-borne-virus support']]),
  'disability-ageing':question('careNeed','What would help?',[['disability','Disability access, advocacy or daily support'],['aged','Finding aged care or daily living help'],['rights','Aged-care rights or advocacy'],['carer','Support for an unpaid carer']]),
@@ -34,26 +34,51 @@ const subquestions={
  'legal-help':question('legalNeed','What is the problem?',[['general','General legal advice'],['housing','NT Housing complaint or appeal'],['discrimination','Discrimination'],['children','Children and Families complaint'],['government','Government / police complaint'],['identity','An LGBTQIASB+ identity-related legal issue'],['violence','Family or sexual-violence legal help'],['women','A women’s or gender-specific legal service']]),
  'access-culture-disability':question('accessNeed','What would help?',[['language','Interpreting or communication access'],['transport','Transport or local safety patrol'],['settlement','Refugee or migrant settlement support'],['veteran','Veteran or Defence-family navigation']])
 };
-const ageNeeds=new Set(['safe-tonight','longer-term-housing','children-youth-family','food-essentials','health-wellbeing','alcohol-drugs','disability-ageing','legal-transition']);
+function needsAge(a){
+ if(a.need==='safe-tonight'||a.need==='health-wellbeing'||a.need==='alcohol-drugs')return true;
+ if(a.need==='longer-term-housing')return ['private','mental'].includes(a.housingGoal);
+ if(a.need==='children-youth-family')return ['housing','young-parent'].includes(a.familyNeed);
+ if(a.need==='food-essentials')return a.essentialNeed==='youth';
+ if(a.need==='money-benefits')return a.moneyNeed==='bond';
+ if(a.need==='disability-ageing')return a.careNeed!=='carer';
+ return a.need==='legal-transition'&&['custody','care','treatment'].includes(a.transitionNeed);
+}
+export function regionModeFor(topic,a={}){
+ if(topic==='help')return 'none';
+ const n=a.need;
+ if(n==='keep-tenancy')return a.tenancyNeed==='advice'?'none':'full';
+ if(n==='violence-safety')return a.safetyNeed==='older'||a.safetyNeed==='refuge'&&a.refugeFor==='other'?'none':'full';
+ if(n==='children-youth-family')return a.familyNeed==='safety'?'none':'full';
+ if(n==='money-benefits')return a.moneyNeed==='debt'?'full':'none';
+ if(n==='identity-digital')return ['id','online'].includes(a.digitalNeed)?'full':'none';
+ if(n==='health-medical-travel')return a.medicalNeed==='advice'?'none':'full';
+ if(n==='disability-ageing')return a.careNeed==='carer'?'none':'full';
+ if(n==='legal-transition')return a.transitionNeed==='care'?'none':'full';
+ if(n==='legal-help')return ['women','violence'].includes(a.legalNeed)?'full':'none';
+ if(n==='access-culture-disability')return ['language','veteran'].includes(a.accessNeed)?'none':'full';
+ return 'full';
+}
 const communities=Object.entries(safeHouseCommunities).map(([order,[value,region]])=>({value,region,label:issue(4).rows.find(row=>row.row_order===Number(order)).display.location.replace(/\n/g,' ')}));
 export function questionsFor(topic,a={}){
- if(topic==='help')return [regions];
+ if(topic==='help')return [];
  const allowed=topicNeeds[topic]||[],qs=[question('need','What would help?',allowed.map(id=>[id,needTitles[id]]))];
  if(!allowed.includes(a.need))return qs;
  if(subquestions[a.need])qs.push(subquestions[a.need]);
  if(a.need==='violence-safety'&&a.safetyNeed==='refuge')qs.push(question('refugeFor','Who needs a safe place?',[['woman-child','A woman with children'],['woman','A woman without children'],['first-nations-child','An Aboriginal or Torres Strait Islander woman with children'],['first-nations-woman','An Aboriginal or Torres Strait Islander woman without children'],['other','Another situation / not sure']]));
- if(ageNeeds.has(a.need))qs.push(ages);
+ if(a.need==='access-culture-disability'&&a.accessNeed==='language')qs.push(question('languageNeed','What communication support?',[['aboriginal','An Aboriginal-language interpreter'],['other-language','An interpreter for another language'],['relay','Relay for hearing or speech difficulty']]));
+ if(a.need==='access-culture-disability'&&a.accessNeed==='transport')qs.push(question('transportNeed','What kind of transport help?',[['bus','Public buses'],['community','Community transport'],['patrol','A local safety patrol']]));
+ if(needsAge(a))qs.push(ages);
  if(a.need==='safe-tonight')qs.push(household);
- qs.push(regions);
- if(a.need==='violence-safety'&&a.safetyNeed==='refuge'&&a.region&&a.region!=='unsure'){
+ if(regionModeFor(topic,a)==='full')qs.push(regions);
+ if(a.need==='violence-safety'&&a.safetyNeed==='refuge'&&a.refugeFor!=='other'&&a.region&&a.region!=='unsure'){
   const local=communities.filter(c=>c.region===a.region);
   if(local.length)qs.push(question('community','Which community needs a refuge?',[...local.map(c=>[c.value,c.label]),['other','Another place / not sure']]));
  }
  return qs;
 }
-export function preferencesFor(){return options([['no-phone','I cannot use a phone','Show supplied email, forms or chat where available; a website alone is not intake.'],['no-transport','I cannot get to a service','Ask about outreach or travel before making a journey.']]);}
+export function preferencesFor(){return options([['no-phone','I cannot use a phone']]);}
 const bands={'under15':[0,14],'15-18':[15,18],'19-21':[19,21],'22-24':[22,24],'25-49':[25,49],'50-64':[50,64],'65+':[65,120]};
-const ageRules={'salvos-house-49':[25,null],'salvos-sunrise-homelessness':[18,null],'mission-katherine-accommodation':[18,null],'salvos-todd-street-men':[18,null],'vinnies-darwin-housing':[18,null],'vinnies-katherine-housing':[18,null],'teamhealth-community-housing':[18,null],'teamhealth-rent-to-live':[18,null],'chca-private-rental-liaison':[18,null],'ywca-casy-house':[15,18],'anglicare-yass':[15,21],'anglicare-yhopp':[10,25],'anglicare-reconnect':[12,18],'catholiccare-assertive-outreach':[10,25],'asyass-crisis-refuge':[13,17],'asyass-youth-housing':[16,24],'asyass-ampe-akweke':[14,23],'waltja-youth-family':[12,18],'anglicare-youth-emergency-relief':[12,25],'kids-helpline':[5,25],'headspace-nt-youth':[12,25],'caaps-strong-steps':[13,null],'caaps-youth-treatment':[12,17],'banyan-residential-recovery':[18,null],'amity-counselling':[14,null],'kalano-venndale':[18,null],'dasa-aranda-outreach':[18,null],'dasa-sobering-up':[14,null],'bushmob-youth-aod':[12,25],'ndis-access':[null,64],'my-aged-care':[50,null],'anglicare-care-finder':[50,null],'dcls-seniors-rights':[50,null],'anglicare-commonwealth-home-support':[50,null],'anglicare-moving-on':[16,25],'teamhealth-pathways-strong-foundations':[18,null],'teamhealth-subacute':[18,64],'dasa-transitional-aftercare':[18,null],'dasa-alternative-custody':[18,null]};
+const ageRules={'nt-private-rental-bond':[18,null],'salvos-house-49':[25,null],'salvos-sunrise-homelessness':[18,null],'mission-katherine-accommodation':[18,null],'salvos-todd-street-men':[18,null],'vinnies-darwin-housing':[18,null],'vinnies-katherine-housing':[18,null],'teamhealth-community-housing':[18,null],'teamhealth-rent-to-live':[18,null],'chca-private-rental-liaison':[18,null],'ywca-casy-house':[15,18],'anglicare-yass':[15,21],'anglicare-yhopp':[10,25],'anglicare-reconnect':[12,18],'catholiccare-assertive-outreach':[10,25],'asyass-crisis-refuge':[13,17],'asyass-youth-housing':[16,24],'asyass-ampe-akweke':[14,23],'waltja-youth-family':[12,18],'anglicare-youth-emergency-relief':[12,25],'kids-helpline':[5,25],'headspace-nt-youth':[12,25],'caaps-strong-steps':[13,null],'caaps-youth-treatment':[12,17],'banyan-residential-recovery':[18,null],'amity-counselling':[14,null],'kalano-venndale':[18,null],'dasa-aranda-outreach':[18,null],'dasa-sobering-up':[14,null],'bushmob-youth-aod':[12,25],'ndis-access':[null,64],'my-aged-care':[50,null],'anglicare-care-finder':[50,null],'dcls-seniors-rights':[50,null],'anglicare-commonwealth-home-support':[50,null],'anglicare-moving-on':[16,25],'teamhealth-pathways-strong-foundations':[18,null],'teamhealth-subacute':[18,64],'dasa-transitional-aftercare':[18,null],'dasa-alternative-custody':[18,null]};
 const subsets={
  housingGoal:{social:[1,2,6,7,8],family:[3,5,6,9,10],private:[5,11],mental:[4,5],unsure:[1]},
  tenancyNeed:{advice:[1],repairs:[2,9],support:[1,3,4,5,6,7,8]},
@@ -62,7 +87,7 @@ const subsets={
  familyNeed:{family:[1,12,13],housing:[1,4,5,6,7,8,9,10,14], 'young-parent':[1,11],school:[1,3,15],safety:[2]},
  essentialNeed:{food:[1,2,3,5,6,8,9,10],washing:[1,7,8,9],youth:[4]},
  moneyNeed:{payments:[1,2],debt:[3,7,8,9,10,11],electricity:[4],bond:[6],concessions:[5]},
- digitalNeed:{id:[1],online:[2,3,4,5,6],find:[2]},
+ digitalNeed:{birth:[1],id:[1],online:[2,3,4,5,6],find:[2]},
  medicalNeed:{advice:[1],clinic:[1,3,4,5,6,7,8,9,10,12,13,14,15,16],travel:[2],renal:[11]},
  aodNeed:{advice:[1,3,8],residential:[4,5,6,7,11,13,15,16,19],withdrawal:[1,2,18],sobering:[9,12,14,17,20],harm:[10]},
  careNeed:{disability:[1,4,8,11,13,14,15,16,18,19],aged:[2,5,7,8,9,12,14,15,17,18,19],rights:[6,10],carer:[3]},
@@ -99,12 +124,27 @@ export function matchRow(row,a={}){
  if(a.need==='safe-tonight'&&a.household==='unsure'&&directAccommodation.has(row.catalogue_id))qualification+=' Household eligibility is not established; ask for an assessment or another route.';
  if(row.catalogue_id==='anglicare-yass')qualification+=' Published age limits conflict; confirm the current intake rule.';
  if(row.catalogue_id==='purple-house-practical'&&a.region==='central')qualification+=' This is a patient-support enquiry for participating remote communities. Ask the programme to assess your renal care and catchment; local delivery is not confirmed.';
- return {row,qualification};
+ return {row,qualification,ageConditional:age.conditional};
 }
 function rowChoices(a){
  const number=needIssues[a.need],selected=rows.filter(row=>row.issue_number===number);
  const key=Object.keys(subsets).find(k=>subsets[k][a[k]]&&subquestions[a.need]?.id===k);
- return key?selected.filter(row=>subsets[key][a[key]].includes(row.row_order)):selected;
+ let candidates=key?selected.filter(row=>subsets[key][a[key]].includes(row.row_order)):selected;
+ if(a.need==='identity-digital'&&a.digitalNeed==='id')candidates.push(...rows.filter(row=>row.issue_number===5&&[1,5].includes(row.row_order)));
+ if(a.need==='access-culture-disability'&&a.accessNeed==='language'&&a.languageNeed){
+  const order={aboriginal:1,'other-language':2,relay:3}[a.languageNeed];candidates=candidates.filter(row=>row.row_order===order);
+ }
+ if(a.need==='access-culture-disability'&&a.accessNeed==='transport'&&a.transportNeed){
+  const orders={bus:[6],community:[10],patrol:[5,9,11,12,13,14,15]}[a.transportNeed];candidates=candidates.filter(row=>orders?.includes(row.row_order));
+ }
+ return candidates;
+}
+function resultNote(a){
+ const published=issue(needIssues[a.need])?.note||'Published eligibility, fees and catchments apply. No bed, appointment or acceptance has been checked live.';
+ if(a.need==='violence-safety')return 'Immediate danger: call 000. '+published;
+ if(a.need!=='safe-tonight')return published;
+ const gap={tennant:'Barkly',arnhem:'East Arnhem'}[a.region];
+ return 'Confirm vacancies, costs, household/carer fit, disability access and pets.'+(gap?' General crisis and youth beds in '+gap+' are not confirmed here; specialist services have separate entry rules.':'')+' After hours or if full, ask for a safe alternative; none is guaranteed.';
 }
 export function getResults(topic,a={}){
  const contactMode=a.preferences?.includes('no-phone')?'no-phone':'standard';
@@ -114,8 +154,15 @@ export function getResults(topic,a={}){
  }
  let matched=rowChoices(a).map(row=>matchRow(row,a)).filter(Boolean);
  if(a.need==='safe-tonight')matched.sort((x,y)=>Number(directAccommodation.has(y.row.catalogue_id)&&!y.qualification)-Number(directAccommodation.has(x.row.catalogue_id)&&!x.qualification)||x.row.geography.rank-y.row.geography.rank||x.row.row_order-y.row.row_order);
+ if(a.need==='health-wellbeing'){
+  const local=new Set(['darwin-medicare-mental-health','strongbala-minds-katherine','headspace-nt-youth','mhaca-drop-in-pathways','sandstone-counselling','mifant-mitrack']);
+  matched.sort((x,y)=>Number(local.has(y.row.catalogue_id)&&!y.ageConditional)-Number(local.has(x.row.catalogue_id)&&!x.ageConditional));
+ }
+ // A partially overlapping age band is a qualified enquiry. Put known age
+ // fits before it, including in the first three contacts.
+ matched.sort((x,y)=>Number(x.ageConditional)-Number(y.ageConditional));
  if(contactMode==='no-phone')matched.sort((x,y)=>Number(contactOptionsForNoPhone(y.row))-Number(contactOptionsForNoPhone(x.row)));
- let note=issue(needIssues[a.need])?.note||'Published eligibility, fees and catchments apply. No bed, appointment or acceptance has been checked live.';
+ let note=resultNote(a);
  if(!matched.length)note+=' No direct route is matched for these choices. The service finder below can help you search locally; change your choices or ask a worker about another route.';
  if(contactMode==='no-phone')note+=' Only supplied non-phone links are offered. Forms and email may take time; a website alone is not confirmed online intake.';
  if(a.region==='npy')note+=' NPY community and border coverage must be assessed by the programme; NT-wide enquiries do not establish SA or WA entitlements.';

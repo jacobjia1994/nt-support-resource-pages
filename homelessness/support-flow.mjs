@@ -1,4 +1,4 @@
-import {questionsFor, preferencesFor} from './support-paths.mjs?v=20261005-1';
+import {questionsFor, preferencesFor} from './support-paths.mjs?v=20261005-tasks-3';
 
 const ntRegions = new Set(['darwin','katherine','alice','tennant','arnhem','topend','central','npy','unsure']);
 const contextRegions = new Set([...ntRegions]);

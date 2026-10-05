@@ -5,11 +5,11 @@ Two static, source-linked support finders:
 - [Housing and homelessness](homelessness/) — people without a safe or stable home, families and workers in the NT.
 - [Defence family support](defence/) — Defence members, veterans and families.
 
-Both retain seven task-first topics. Relevant questions appear on the same page and contacts appear automatically once the necessary choices are complete. The first three contacts reflect the selected need, eligibility and local fit; additional relevant routes and the optional resource-detail browser remain available. Answers stay in memory and are not collected or submitted.
+Both start from concrete tasks. Essential ID, phone and benefit-access help is visible on the housing page; posting and time apart lead to practical actions on the Defence page. Additional specific tasks are expanded by default. Each task asks only the questions that change eligibility or contact order, one at a time, with a Next button and editable answers. Contacts appear once the necessary choices are complete. The first three contacts reflect the selected need, eligibility and local fit; additional relevant routes and the optional resource-detail browser remain available. Answers stay in memory and are not collected or submitted.
 
 The verified public resource snapshot was checked on 5 October 2026:
 
-| Demo | Issue groups | Distinct service routes | Issue-specific entries | Source catalogue IDs |
+| Page | Issue groups | Distinct service routes | Issue-specific entries | Source catalogue IDs |
 | --- | ---: | ---: | ---: | ---: |
 | Housing and homelessness | 16 | 219 | 219 | 194 |
 | Defence family support | 45 | 189 | 337 | 141 |
@@ -18,7 +18,7 @@ These counts describe routes and cross-listed entries, not unique providers or e
 
 Providers confirm current eligibility, hours, fees and availability. No live bed or appointment availability is supplied. NT Central Intake uses its published online referral route during the telephone outage; its non-urgent response window is retained. The Alice Springs Lutheran Care venue notice is retained. In immediate danger, call 000 directly from either page.
 
-The demos share a stylesheet, while specific titles, audience descriptions, house/family symbols and a restrained LC-compatible navy, warm-orange and white palette distinguish them. Lutheran Care branding is retained; the pages identify themselves as resource demos for review.
+The pages share a stylesheet and established Lutheran Care branding. Specific prominent titles, audience descriptions and house/family symbols distinguish them within a consistent navy, warm-orange and white palette. Titles use the available desktop width and wrap naturally on mobile. Public copy has no prototype or internal review labels and makes no claim of an approved official rollout.
 
 ## Local checks
 
