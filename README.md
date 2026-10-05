@@ -18,7 +18,7 @@ These counts describe routes and cross-listed entries, not unique providers or e
 
 Providers confirm current eligibility, hours, fees and availability. No live bed or appointment availability is supplied. NT Central Intake uses its published online referral route during the telephone outage; its non-urgent response window is retained. The Alice Springs Lutheran Care venue notice is retained. In immediate danger, call 000 directly from either page.
 
-The demos share a stylesheet, while specific titles, audience descriptions, house/family symbols and accessible teal/blue treatments distinguish them. Lutheran Care branding is retained; the pages identify themselves as resource demos for review.
+The demos share a stylesheet, while specific titles, audience descriptions, house/family symbols and a restrained LC-compatible navy, warm-orange and white palette distinguish them. Lutheran Care branding is retained; the pages identify themselves as resource demos for review.
 
 ## Local checks
 
