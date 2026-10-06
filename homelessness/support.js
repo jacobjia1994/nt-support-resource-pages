@@ -63,11 +63,16 @@ function currentFlow() {
 function taskLink(task,compact=false) {
  return `<li><a class="${compact?'extra-task-link':'task-link'}" href="#task/${esc(task.id)}"><span><strong>${esc(task.title)}</strong>${!compact&&task.hint?`<small>${esc(task.hint)}</small>`:''}</span>${compact?'':arrow}</a></li>`;
 }
+const homeEntries=[{"title":"A place to stay tonight","href":"#task/tonight","tasks":["tonight"]},{"title":"Safety from violence","href":"#task/violence","tasks":["violence"]},{"id":"housing","title":"Keep or find a home","tasks":["keep-home","stable-home","young-person-housing","return-home","leaving-service"]},{"id":"everyday","title":"Food, money and practical help","tasks":["food-washing","money-bills","id-online","transport"]},{"id":"health-care","title":"Health and care","tasks":["mental-health","medical","alcohol-drugs","disability","aged-care","carer"]},{"id":"family","title":"Family and veteran support","tasks":["family-school","veteran-family"]},{"id":"rights","title":"Legal advice and complaints","tasks":["legal","complaint"]},{"id":"access","title":"Interpreting and settlement help","tasks":["communication","settlement"]}];
 function showHome() {
  rememberAnswers();activeJourney=null;editingQuestion=null;
- const groups=[["Housing and safety", ["tonight", "violence", "keep-home", "stable-home", "young-person-housing", "return-home", "leaving-service"]], ["Food, money and practical help", ["food-washing", "money-bills", "id-online", "transport"]], ["Health and wellbeing", ["mental-health", "medical", "alcohol-drugs"]], ["Family and caring", ["family-school", "disability", "aged-care", "carer"]], ["Rights and getting support", ["legal", "complaint", "communication", "settlement", "veteran-family"]]];
- root.innerHTML=`<h1 tabindex="-1">NT housing & homelessness support</h1><p class="human-link home-help"><a href="#help">Not sure where to start? Get help finding a service</a></p><div class="home-groups">${groups.map(([title,ids],i)=>`<section class="home-group" aria-labelledby="help-group-${i}"><h2 id="help-group-${i}" tabindex="-1">${esc(title)}</h2><ul class="home-links">${ids.map(id=>taskLink(journeys.find(task=>task.id===id),true)).join('')}</ul></section>`).join('')}</div>`;
+ root.innerHTML=`<h1 tabindex="-1">NT housing & homelessness support</h1><ul class="home-links home-entry-grid" aria-label="Choose the help you need">${homeEntries.map(entry=>`<li><a class="task-link" href="${esc(entry.href||'#start/'+entry.id)}"><span><strong>${esc(entry.title)}</strong></span>${arrow}</a></li>`).join('')}</ul><p class="human-link home-help"><a href="#help">Not sure where to start? Get help finding a service</a></p>`;
  document.title='NT housing & homelessness support | Lutheran Care';
+}
+function showStartMenu(entry) {
+ rememberAnswers();activeJourney=null;editingQuestion=null;
+ root.innerHTML=`<nav class="back-nav" aria-label="Support navigation"><a href="#home">All housing help</a></nav><h1 tabindex="-1">${esc(entry.title)}</h1><ul class="home-links" aria-label="Choose the help you need">${entry.tasks.map(id=>taskLink(journeys.find(task=>task.id===id))).join('')}</ul>`;
+ document.title=`${entry.title} | NT housing & homelessness support | Lutheran Care`;
 }
 
 function showTaskMenu(task) {
@@ -262,6 +267,11 @@ function advanceQuestion() {
 function render() {
   const rawHash = location.hash.slice(1);
   const segments = rawHash.split('/');
+  if(segments[0]==='start'){
+    const entry=homeEntries.find(item=>item.id&&item.id===segments[1]);
+    if(entry)showStartMenu(entry);else showHome();
+    if(started)focusHeading();started=true;return;
+  }
   if(segments[0]==='task'){
     const task=journeys.find(t=>t.id===segments[1]);
     const index=segments[2]===undefined&&task?.choices.length===1?0:Number(segments[2]);
