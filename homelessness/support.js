@@ -7,7 +7,20 @@ import {handbookDirectory,handbookNeeds,handbookRegions,catalogueMetadata,handbo
 const root = document.getElementById('finder');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const arrow = '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>';
-const link = (url, label, className='') => `<a class="${className}" href="${esc(url)}" rel="noreferrer">${esc(label)}</a>`;
+// Keep providers out of a host iframe: some official services reject framing.
+const isEmbedded = window.self !== window.top;
+const externalTarget = url => isEmbedded && /^https?:\/\//i.test(url);
+const link = (url, label, className='') => `<a class="${className}" href="${esc(url)}" rel="${externalTarget(url)?'noopener noreferrer':'noreferrer'}"${externalTarget(url)?` target="_blank" aria-label="${esc(label+' (opens in a new tab)')}"`:''}>${esc(label)}</a>`;
+function prepareEmbeddedWebLinks() {
+  if (!isEmbedded) return;
+  // Static urgent links live outside the dynamic finder.
+  document.querySelector('.page-shell')?.querySelectorAll('a[href]').forEach(anchor => {
+    if (!externalTarget(anchor.getAttribute('href'))) return;
+    anchor.target = '_blank';
+    anchor.rel = 'noopener noreferrer';
+    anchor.setAttribute('aria-label',anchor.textContent.trim()+' (opens in a new tab)');
+  });
+}
 const telephone = phone => `tel:${phone.replace(/\D/g,'')}`;
 const topicById = id => topics.find(topic => topic.id === id) || (id === 'help' ? {id:'help',title:'Help finding support',hint:''} : null);
 const ntRegions = new Set(['darwin','katherine','alice','tennant','arnhem','topend','central','npy','unsure']);
@@ -135,7 +148,7 @@ function showDirectory(selectedId='') {
 }
 function safetyNotice(topic) {
   if (topic.id !== 'safety' || state.answers.need !== 'violence-safety') return '';
-  return '<p class="notice safety-note">In immediate danger, call <a href="tel:000">000</a>. For violence or sexual assault, <a href="tel:1800737732">1800RESPECT: 1800 737 732</a> and <a href="https://www.1800respect.org.au/" rel="noreferrer">online chat</a> are available 24/7. Use a safe device if someone may monitor this one.</p>';
+  return `<p class="notice safety-note">In immediate danger, call <a href="tel:000">000</a>. For violence or sexual assault, <a href="tel:1800737732">1800RESPECT: 1800 737 732</a> and ${link('https://www.1800respect.org.au/','online chat')} are available 24/7. Use a safe device if someone may monitor this one.</p>`;
 }
 function questionMarkup(question) {
   const prefix = `question-${state.topicId}-${question.id}`;
@@ -431,3 +444,4 @@ window.addEventListener('afterprint', () => {
   printOpened=[];
 });
 render();
+prepareEmbeddedWebLinks();
