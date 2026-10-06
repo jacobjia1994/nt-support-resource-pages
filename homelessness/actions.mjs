@@ -6,6 +6,7 @@ export const pages={...primaryPages,...secondaryPages};
 export const topicPages={1:'tonight',2:'stable-home',3:'keep-home',4:'violence',5:'visiting',6:'youth-housing',7:'food-washing',8:'money-bills',9:'id-online',10:'health-medical',11:'mental-health',12:'alcohol-drugs',13:'disability-ageing',14:'leaving-service',15:'legal',16:'transport-communication'};
 const legacy={tonight:'tonight',violence:'violence','food-washing':'food-washing','keep-home':'keep-home','stable-home':'stable-home','money-bills':'money-bills','mental-health':'mental-health',medical:'health-medical','id-online':'id-online','young-person-housing':'youth-housing','family-school':'family-school','return-home':'visiting','alcohol-drugs':'alcohol-drugs',disability:'disability-ageing','aged-care':'disability-ageing',carer:'disability-ageing','leaving-service':'leaving-service',legal:'legal',complaint:'legal',communication:'transport-communication',transport:'transport-communication',settlement:'transport-communication','veteran-family':'transport-communication'};
 const oldNeeds={'safe-tonight':'tonight','longer-term-housing':'stable-home','keep-tenancy':'keep-home','food-essentials':'food-washing','money-benefits':'money-bills','identity-digital':'id-online','violence-safety':'violence','health-wellbeing':'mental-health','health-medical-travel':'health-medical','alcohol-drugs':'alcohol-drugs','children-youth-family':'family-school','legal-transition':'leaving-service','legal-help':'legal','access-culture-disability':'transport-communication','disability-ageing':'disability-ageing','return-home':'visiting'};
+const legacyAliases={stay:'safe-tonight',housing:'longer-term-housing','keep-home':'keep-tenancy',essentials:'food-essentials',money:'money-benefits',identity:'identity-digital',safety:'violence-safety',health:'health-wellbeing',aod:'alcohol-drugs',family:'children-youth-family',transition:'legal-transition',access:'access-culture-disability'};
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const hrefFor=row=>'#service/'+encodeURIComponent(row.appearance_id);
 const issueRows=n=>rows.filter(r=>r.issue_number===n);
@@ -22,8 +23,10 @@ export function directoryRows(query='',issue=''){
 export function resolveRoute(hash){
  let parts;try{parts=(hash||'#home').replace(/^#/,'').split('/').map(decodeURIComponent);}catch{return {type:'missing'};}
  if(parts[0]==='task'&&legacy[parts[1]])return {type:'page',id:legacy[parts[1]]};
- if(parts[0]==='menu')return {type:'topics'};
+ if(parts[0]==='menu'||parts[0]==='start')return {type:'topics'};
  if(parts[0]==='need'&&topicPages[Number(parts[1])])return {type:'page',id:topicPages[Number(parts[1])]};
+ const historicalNeed=legacyAliases[parts[1]||parts[0]];
+ if(historicalNeed)return {type:'page',id:oldNeeds[historicalNeed]};
  if(oldNeeds[parts[1]]||oldNeeds[parts[0]])return {type:'page',id:oldNeeds[parts[1]]||oldNeeds[parts[0]]};
  if(parts[0]==='issue'){const n=Number(parts.at(-1));return topicPages[n]?{type:'page',id:topicPages[n]}:{type:'topics'};}
  if(parts[0]==='directory')return parts[1]&&rowsById[parts.slice(1).join('/')]?{type:'service',id:parts.slice(1).join('/')}:{type:'directory'};
@@ -33,6 +36,7 @@ export function resolveRoute(hash){
  if(parts[0]==='topics')return {type:'topics'};
  if(parts[0]==='urgent-help'||parts[0]==='urgent')return {type:'urgent'};
  if(parts[0]==='help')return {type:'page',id:'id-online'};
+ if(parts[0]==='main')return {type:'home'};
  if(parts[0]==='home'||!parts[0])return {type:'home'};
  return {type:'missing'};
 }
@@ -99,7 +103,7 @@ if(typeof document!=='undefined'){
   if(event.target.closest('[data-clear]')){directory={query:'',issue:''};render();root.querySelector('input')?.focus();return;}
   const a=event.target.closest('a[href^="#"]');if(!a||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
   if(['#youth','#outreach','#later'].includes(a.hash)){event.preventDefault();const target=document.querySelector(a.hash);target?.querySelector('details')?.setAttribute('open','');target?.scrollIntoView();return;}
-  if(a.hash==='#main')return;event.preventDefault();if(a.hash.startsWith('#service/')&&!location.hash.startsWith('#service/'))returnTo=location.hash||'#home';if(location.hash!==a.hash)history.pushState(null,'',a.hash);render(true);
+  if(a.hash==='#main'){event.preventDefault();root.querySelector('h1')?.focus();root.scrollIntoView();return;}event.preventDefault();if(a.hash.startsWith('#service/')&&!location.hash.startsWith('#service/'))returnTo=location.hash||'#home';if(location.hash!==a.hash)history.pushState(null,'',a.hash);render(true);
  });
  root.addEventListener('input',event=>{if(event.target.name==='query'){directory.query=event.target.value;root.querySelector('#records').innerHTML=recordList();}});
  root.addEventListener('change',event=>{if(event.target.name==='issue'){directory.issue=event.target.value;root.querySelector('#records').innerHTML=recordList();}});

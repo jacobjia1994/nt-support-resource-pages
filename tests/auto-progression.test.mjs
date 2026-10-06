@@ -235,10 +235,16 @@ for(const site of sites){
   const urgent=ui.pageJump('urgent-help');assert.equal(ui.active(),urgent);assert.equal(urgent.scrolled,true);assert.equal(ui.location.href,url);assert.equal(ui.calls.length,before);
   assert.equal(ui.submit(),true);assert.equal(ui.calls.length,before);
  });
- test(site+': shipped runtime uses discovery without old flow gates or persistent collection',()=>{
-  const bootstrap=read(site,'support.js'),app=read(site,'support-app.mjs');
-  assert.match(bootstrap,/support-discovery\.mjs/);assert.match(bootstrap,/createSupportApp/);
-  assert.doesNotMatch(bootstrap,/support-flow\.mjs|support-paths\.mjs/);
-  assert.doesNotMatch(app,/getFlowState|currentFlow|nextQuestion|\.complete\b|verifiedResults|localStorage|sessionStorage|indexedDB|navigator\.sendBeacon|XMLHttpRequest|\bfetch\s*\(/);
+ test(site+': current authored pages load their real runtime without profile gates or persistent collection',()=>{
+  // Earlier renderer fixtures remain isolated component regressions. Resolve
+  // the current entry from HTML here; no unused import can satisfy this check.
+  const graph=new Map();
+  function visit(url){url.search='';if(graph.has(url.href))return;const source=readFileSync(url,'utf8');graph.set(url.href,source);
+   const specs=[...[...source.matchAll(/\b(?:import|export)\s+(?:[^;\n]*?\s+from\s+)?['"]([^'"]+)['"]/g)].map(m=>m[1]),...[...source.matchAll(/\bimport\s*\(\s*['"]([^'"]+)['"]/g)].map(m=>m[1])];
+   for(const spec of specs){assert.match(spec,/^\.\.?\//,'The public runtime only loads its local modules');visit(new URL(spec,url));}
+  }
+  for(const name of ['index.html','support.html']){const html=read(site,name),entries=[...html.matchAll(/<script\b[^>]*type="module"[^>]*src="([^"]+)"/g)].map(m=>m[1]);assert.equal(entries.length,1,'Each entry page declares one real enhancement runtime');assert.match(entries[0],site==='homelessness'?/^actions\.mjs(?:\?|$)/:/^support\.js(?:\?|$)/);visit(new URL(entries[0],new URL('../'+site+'/'+name,import.meta.url)));}
+  assert.ok(graph.size>0);
+  for(const [url,source] of graph){assert.doesNotMatch(new URL(url).pathname,/support-(?:app|flow|paths|discovery)\.mjs$/,'Retained previous-model modules are outside the deployed module graph');assert.doesNotMatch(source,/\b(?:getFlowState|currentFlow|nextQuestion|verifiedResults)\b|\b(?:localStorage|sessionStorage|indexedDB|XMLHttpRequest)\b|navigator\.sendBeacon|\bfetch\s*\(/);}
  });
 }
