@@ -303,3 +303,20 @@ test('remote laundry enquiries use the exact community list and national contact
  assert.equal(darwin.fitNote,'');assert.equal(darwin.offer,source.display.help);
  assert.deepEqual(darwin.contactOptions.filter(o=>o.channel==='phone').map(o=>o.href),['tel:0730675800']);
 });
+
+test('veteran referral remains housing-specific and cannot enter general housing or food results',()=>{
+ const r=result('access',{need:'access-culture-disability',accessNeed:'veteran'});
+ assert.deepEqual(catalogues(r),['veteran-family-wellbeing-navigation']);
+ const card=r.servicesById[r.ids[0]];
+ assert.equal(card.audience,card.raw.display.who);
+ assert.equal(card.offer,card.raw.display.help);
+ assert.equal(card.access,card.raw.display.access);
+ assert.match(r.note,/housing difficulties/);assert.match(r.note,/not a crisis service/);
+ assert.doesNotMatch(r.note+r.say+r.contextLabel,/transport|interpreters|Defence-family support/i);
+ assert.equal(r.preferenceLink.href,'https://www.veteranwellbeing.gov.au/whatwedo');
+ for(const region of ['darwin','katherine','tennant','alice','arnhem','topend','central','npy','unsure']){
+  for(const [topic,a]of [['housing',{need:'safe-tonight',age:'25-49',household:'family'}],['housing',{need:'longer-term-housing',housingGoal:'unsure'}],['essentials',{need:'food-essentials',essentialNeed:'food'}]]){
+   assert(!catalogues(result(topic,{...a,region})).includes('veteran-family-wellbeing-navigation'));
+  }
+ }
+});

@@ -21,7 +21,7 @@ export const journeys=[
   choice('Supported housing for a family','housing','longer-term-housing',{housingGoal:'family'}),
   choice('Help moving into private rental','housing','longer-term-housing',{housingGoal:'private'}),
   choice('Housing with mental-health support','housing','longer-term-housing',{housingGoal:'mental'}),
-  choice('I am not sure which housing help fits','housing','longer-term-housing',{housingGoal:'unsure'})]},
+  choice('I am not sure which housing help fits','housing','longer-term-housing',{housingGoal:'unsure'})],relatedLinks:[{label:'Veterans and families facing housing difficulties: help navigating services',href:'#task/veteran-family'}]},
  {id:'money-bills',title:'Money, bills & income',hint:'Payments, debt, electricity or rental costs',primary:true,choices:[
   choice('Payments or Centrelink social work','money','money-benefits',{moneyNeed:'payments'}),
   choice('Debt or financial counselling','money','money-benefits',{moneyNeed:'debt'}),
@@ -84,5 +84,5 @@ export const journeys=[
   choice('Community transport','access','access-culture-disability',{accessNeed:'transport',transportNeed:'community'}),
   choice('A local safety patrol','access','access-culture-disability',{accessNeed:'transport',transportNeed:'patrol'})]},
  {id:'settlement',title:'Refugee or migrant settlement help',hint:'Practical support after arriving',primary:false,choices:[choice('Settlement help','access','access-culture-disability',{accessNeed:'settlement'})]},
- {id:'veteran-family',title:'Veteran & Defence-family support',hint:'Help coordinating services',primary:false,choices:[choice('Veteran or Defence-family support','access','access-culture-disability',{accessNeed:'veteran'})]}
+ {id:'veteran-family',title:'Help finding housing services for veterans and families',hint:'For veterans and families facing housing difficulties',primary:false,choices:[choice('Housing-service navigation for veterans and families','access','access-culture-disability',{accessNeed:'veteran'})]}
 ];

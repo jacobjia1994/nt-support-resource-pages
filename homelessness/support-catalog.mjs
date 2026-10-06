@@ -1,4 +1,4 @@
-import release from './release-data.mjs';
+import release from './release-data.mjs?v=20261006-housing-scope';
 
 export const sourceCatalog=release;
 export const regionLabels={unsure:'NT-wide contacts / not sure',darwin:'Darwin / Palmerston',katherine:'Katherine / Big Rivers',tennant:'Tennant Creek / Barkly',alice:'Alice Springs',arnhem:'East Arnhem / Nhulunbuy',topend:'Other Top End / remote communities',central:'Other Central Australia / remote communities',npy:'NPY Lands / border communities'};

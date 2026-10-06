@@ -1,8 +1,8 @@
-import {journeys} from './support-journeys.mjs?v=20261005-ux2-review';
-import {topics, questionsFor, preferencesFor, getResults, recoveryResults, legacyRoute} from './support-paths.mjs?v=20261005-ux2-review';
-import {services,serviceView} from './support-catalog.mjs?v=20261005-ux2-review';
-import {getFlowState, applyAnswer} from './support-flow.mjs?v=20261005-ux2-review';
-import {handbookDirectory,handbookNeeds,handbookRegions,catalogueMetadata,handbookLinks} from './support-handbook.mjs?v=20261005-ux2-review';
+import {journeys} from './support-journeys.mjs?v=20261006-housing-scope';
+import {topics, questionsFor, preferencesFor, getResults, recoveryResults, legacyRoute} from './support-paths.mjs?v=20261006-housing-scope';
+import {services,serviceView} from './support-catalog.mjs?v=20261006-housing-scope';
+import {getFlowState, applyAnswer} from './support-flow.mjs?v=20261006-housing-scope';
+import {handbookDirectory,handbookNeeds,handbookRegions,catalogueMetadata,handbookLinks} from './support-handbook.mjs?v=20261006-housing-scope';
 
 const root = document.getElementById('finder');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -35,6 +35,25 @@ function focusHeading() {
   root.querySelector('h1')?.focus();
   window.scrollTo({top:0,behavior:'instant'});
 }
+function startAgain() {
+  state = {topicId:null,answers:{}};
+  topicAnswers.clear();
+  journeyAnswers.clear();
+  historyViews.clear();
+  savedRegion = '';
+  handoff = null;
+  activeJourney = null;
+  editingQuestion = null;
+  restoredHistoryURL = null;
+  directoryChoice.need = '';
+  directoryChoice.region = '';
+  // Browser history keeps its URLs, but no pre-reset answer snapshot survives.
+  // Keep viewCounter monotonic so a stale history key cannot name a new view.
+  history.replaceState(null,'','#home');
+  showHome();
+  started = true;
+  focusHeading();
+}
 function initialiseTopic(topicId, need) {
   if (state.topicId !== topicId) {
     rememberAnswers();
@@ -63,7 +82,7 @@ function currentFlow() {
 function taskLink(task,compact=false) {
  return `<li><a class="${compact?'extra-task-link':'task-link'}" href="#task/${esc(task.id)}"><span><strong>${esc(task.title)}</strong>${!compact&&task.hint?`<small>${esc(task.hint)}</small>`:''}</span>${compact?'':arrow}</a></li>`;
 }
-const homeEntries=[{"title":"A place to stay tonight","href":"#task/tonight","tasks":["tonight"]},{"title":"Safety from violence","href":"#task/violence","tasks":["violence"]},{"id":"housing","title":"Keep or find a home","tasks":["keep-home","stable-home","young-person-housing","return-home","leaving-service"]},{"id":"everyday","title":"Food, money and practical help","tasks":["food-washing","money-bills","id-online","transport"]},{"id":"health-care","title":"Health and care","tasks":["mental-health","medical","alcohol-drugs","disability","aged-care","carer"]},{"id":"family","title":"Family and veteran support","tasks":["family-school","veteran-family"]},{"id":"rights","title":"Legal advice and complaints","tasks":["legal","complaint"]},{"id":"access","title":"Interpreting and settlement help","tasks":["communication","settlement"]}];
+const homeEntries=[{"title":"A place to stay tonight","href":"#task/tonight","tasks":["tonight"]},{"title":"Safety from violence","href":"#task/violence","tasks":["violence"]},{"id":"housing","title":"Keep or find a home","tasks":["keep-home","stable-home","young-person-housing","return-home","leaving-service"]},{"id":"everyday","title":"Food, money and practical help","tasks":["food-washing","money-bills","id-online","transport"]},{"id":"health-care","title":"Health and care","tasks":["mental-health","medical","alcohol-drugs","disability","aged-care","carer"]},{"id":"family","title":"Family and school support","href":"#task/family-school","tasks":["family-school"]},{"id":"rights","title":"Legal advice and complaints","tasks":["legal","complaint"]},{"id":"access","title":"Interpreting and settlement help","tasks":["communication","settlement"]}];
 function showHome() {
  rememberAnswers();activeJourney=null;editingQuestion=null;
  root.innerHTML=`<h1 tabindex="-1">NT housing & homelessness support</h1><ul class="home-links home-entry-grid" aria-label="Choose the help you need">${homeEntries.map(entry=>`<li><a class="task-link" href="${esc(entry.href||'#start/'+entry.id)}"><span><strong>${esc(entry.title)}</strong></span>${arrow}</a></li>`).join('')}</ul><p class="human-link home-help"><a href="#help">Not sure where to start? Get help finding a service</a></p>`;
@@ -71,13 +90,13 @@ function showHome() {
 }
 function showStartMenu(entry) {
  rememberAnswers();activeJourney=null;editingQuestion=null;
- root.innerHTML=`<nav class="back-nav" aria-label="Support navigation"><a href="#home">All housing help</a></nav><h1 tabindex="-1">${esc(entry.title)}</h1><ul class="home-links" aria-label="Choose the help you need">${entry.tasks.map(id=>taskLink(journeys.find(task=>task.id===id))).join('')}</ul>`;
+ root.innerHTML=`<nav class="back-nav" aria-label="Support navigation"><a href="#home">All housing help</a><button type="button" class="text-button" data-action="reset">Start again</button></nav><h1 tabindex="-1">${esc(entry.title)}</h1><ul class="home-links" aria-label="Choose the help you need">${entry.tasks.map(id=>taskLink(journeys.find(task=>task.id===id))).join('')}</ul>`;
  document.title=`${entry.title} | NT housing & homelessness support | Lutheran Care`;
 }
 
 function showTaskMenu(task) {
  rememberAnswers(); activeJourney=task; editingQuestion=null;
- root.innerHTML=`<nav class="back-nav" aria-label="Support navigation"><a href="#home">All help</a></nav><h1 tabindex="-1">${esc(task.title)}</h1>${task.hint?`<p class="intro">${esc(task.hint)}</p>`:''}<ul class="task-grid task-choices" aria-label="Choose what you need">${task.choices.map((choice,index)=>`<li><a class="task-link" href="#task/${esc(task.id)}/${index}"><span><strong>${esc(choice.title)}</strong></span>${arrow}</a></li>`).join('')}</ul>`;
+ root.innerHTML=`<nav class="back-nav" aria-label="Support navigation"><a href="#home">All help</a><button type="button" class="text-button" data-action="reset">Start again</button></nav><h1 tabindex="-1">${esc(task.title)}</h1>${task.hint?`<p class="intro">${esc(task.hint)}</p>`:''}<ul class="task-grid task-choices" aria-label="Choose what you need">${task.choices.map((choice,index)=>`<li><a class="task-link" href="#task/${esc(task.id)}/${index}"><span><strong>${esc(choice.title)}</strong></span>${arrow}</a></li>`).join('')}</ul>${task.relatedLinks?.length?`<p class="human-link">${task.relatedLinks.map(item=>link(item.href,item.label)).join(' ')}</p>`:''}`;
  document.title=`${task.title} | NT housing & homelessness support | Lutheran Care`;
 }
 function initialiseJourney(task,choice,key) {
@@ -109,7 +128,7 @@ function showDirectory(selectedId='') {
   rememberAnswers();
   const selected=handbookDirectory.find(s=>s.id===selectedId);
   if(selected){directoryChoice.need='';directoryChoice.region='';}
-  root.innerHTML=`<nav class="back-nav" aria-label="Support navigation"><a href="#home">All help</a>${state.topicId?`<a href="#${esc(state.topicId)}">Back to your support choices</a>`:''}</nav><h1 tabindex="-1">Housing & homelessness resource details</h1><div class="directory-filters"><label for="directory-need">Need<select id="directory-need"><option value="">All ${catalogueMetadata.needs} issues</option>${handbookNeeds.map(n=>`<option value="${esc(n.id)}"${n.id===directoryChoice.need?' selected':''}>${esc(n.title)}</option>`).join('')}</select></label><label for="directory-region">Region<select id="directory-region"><option value="">All NT regions</option>${Object.entries(handbookRegions).map(([id,name])=>`<option value="${esc(id)}"${id===directoryChoice.region?' selected':''}>${esc(name)}</option>`).join('')}</select></label></div><p id="directory-count" class="directory-count" role="status" aria-live="polite"></p><div id="directory-records"></div><p class="quiet">Information checked ${esc(catalogueMetadata.verifiedDate)}.</p>`;
+  root.innerHTML=`<nav class="back-nav" aria-label="Support navigation"><a href="#home">All help</a>${state.topicId?`<a href="#${esc(state.topicId)}">Back to your support choices</a>`:''}<button type="button" class="text-button" data-action="reset">Start again</button></nav><h1 tabindex="-1">Housing & homelessness resource details</h1><div class="directory-filters"><label for="directory-need">Need<select id="directory-need"><option value="">All ${catalogueMetadata.needs} issues</option>${handbookNeeds.map(n=>`<option value="${esc(n.id)}"${n.id===directoryChoice.need?' selected':''}>${esc(n.title)}</option>`).join('')}</select></label><label for="directory-region">Region<select id="directory-region"><option value="">All NT regions</option>${Object.entries(handbookRegions).map(([id,name])=>`<option value="${esc(id)}"${id===directoryChoice.region?' selected':''}>${esc(name)}</option>`).join('')}</select></label></div><p id="directory-count" class="directory-count" role="status" aria-live="polite"></p><div id="directory-records"></div><p class="quiet">Information checked ${esc(catalogueMetadata.verifiedDate)}.</p>`;
   refreshDirectory(selectedId);
   document.title='Housing & homelessness resource details | Lutheran Care';
   if(selected)requestAnimationFrame(()=>{const record=document.getElementById('record-'+selected.id);record?.scrollIntoView({block:'start'});record?.querySelector('summary')?.focus({preventScroll:true});});
@@ -244,7 +263,7 @@ function showFlow(topic) {
  const title=topic.id==='help'&&handoff?'Find another suitable service':activeJourney?.title||topic.title;
  const context=topic.id==='help'&&handoff?`<p class="handoff-context">${esc(handoff.summary)}</p>`:'';
  const qIndex=question?flow.questions.filter(q=>!fixedQuestionIds().has(q.id)).findIndex(q=>q.id===question.id):-1;
- root.innerHTML=`<nav class="back-nav" aria-label="Support navigation"><a href="#home">All housing help</a>${topic.id==='help'&&handoff?`<a href="${handoff.entryKey?'#task/'+handoff.entryKey:'#'+handoff.topicId}" data-action="return-to-request">Your original contacts</a>`:''}</nav><h1 tabindex="-1">${esc(title)}</h1>${context}<div id="flow-safety">${safetyNotice(topic)}</div>${choiceRecord(flow)}${question?`<form id="support-flow" aria-label="Your support choices" novalidate>${qIndex>0?'<button type="button" class="text-button flow-back" data-action="previous-question">Back to the previous question</button>':''}<div id="flow-questions">${questionMarkup(question)}</div></form>`:''}<p id="flow-status" class="sr-only" role="status" aria-live="polite"></p><div id="flow-related">${relatedMarkup(topic)}</div><section id="support-contacts" class="flow-results" aria-labelledby="support-contacts-heading" tabindex="-1"${flow.complete&&!question?'':' hidden'}>${flow.complete&&!question?resultsMarkup(topic):''}</section>`;
+ root.innerHTML=`<nav class="back-nav" aria-label="Support navigation"><a href="#home">All housing help</a>${topic.id==='help'&&handoff?`<a href="${handoff.entryKey?'#task/'+handoff.entryKey:'#'+handoff.topicId}" data-action="return-to-request">Your original contacts</a>`:''}<button type="button" class="text-button" data-action="reset">Start again</button></nav><h1 tabindex="-1">${esc(title)}</h1>${context}<div id="flow-safety">${safetyNotice(topic)}</div>${choiceRecord(flow)}${question?`<form id="support-flow" aria-label="Your support choices" novalidate>${qIndex>0?'<button type="button" class="text-button flow-back" data-action="previous-question">Back to the previous question</button>':''}<div id="flow-questions">${questionMarkup(question)}</div></form>`:''}<p id="flow-status" class="sr-only" role="status" aria-live="polite"></p><div id="flow-related">${relatedMarkup(topic)}</div><section id="support-contacts" class="flow-results" aria-labelledby="support-contacts-heading" tabindex="-1"${flow.complete&&!question?'':' hidden'}>${flow.complete&&!question?resultsMarkup(topic):''}</section>`;
  document.title=`${title} | NT housing & homelessness support | Lutheran Care`;
 }
 function focusStep() {
@@ -336,6 +355,9 @@ root.addEventListener('keydown', event => {
   }
 });
 root.addEventListener('click', event => {
+  if(event.target.closest('[data-action="reset"]')) {
+    event.preventDefault();startAgain();return;
+  }
   const radio=event.target.closest('input[type="radio"]');
   // Re-selecting the checked answer after Back/Edit emits no change event.
   if(radio?.checked && root.querySelector('#flow-questions fieldset')?.contains(radio) && state.answers[radio.name]===radio.value) { advanceQuestion();return; }
@@ -389,7 +411,12 @@ window.addEventListener('hashchange',()=>{
 });
 window.addEventListener('popstate',event=>{
  const view=historyViews.get(event.state?.supportView);
- if(!view||view.url!==location.href)return;
+ if(!view||view.url!==location.href) {
+   // Same-URL question entries have no hashchange, so render them fresh too.
+   restoredHistoryURL=location.href;
+   render();
+   return;
+ }
  restoredHistoryURL=location.href;
  state={...view.state,answers:copyAnswers(view.state.answers)};editingQuestion=view.editingQuestion;activeJourney=journeys.find(t=>t.id===view.journeyId)||null;savedRegion=view.savedRegion;handoff=view.handoff;
  if(topicById(state.topicId)){showFlow(topicById(state.topicId));focusStep();}

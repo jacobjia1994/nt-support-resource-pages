@@ -4525,10 +4525,17 @@
             "location": "NT-wide /\nphone and online",
             "name": "Veteran and Family Wellbeing Agency",
             "who": "Veterans/families, including serving families preparing for transition.",
-            "help": "Wellbeing navigation and local/national service coordination for complex needs.",
-            "access": "Self-refer by phone/form. Fees: ask. Referred services assess entry; no housing guarantee.",
+            "help": "Wellbeing navigation, including connections to housing support.",
+            "access": "Self-refer by phone/form. Fees: ask. Referred services assess entry; no housing guarantee. Not a crisis service.",
             "contact": "1800 823 922\nWeekdays 8:30am-5pm\nCaller local time",
-            "url": "https://www.veteranwellbeing.gov.au/contact"
+            "url": "https://www.veteranwellbeing.gov.au/contact",
+            "extra_links": [
+              [
+                "Housing navigation and agency remit",
+                "https://www.veteranwellbeing.gov.au/whatwedo"
+              ]
+            ],
+            "checked": "2026-10-06"
           }
         },
         {

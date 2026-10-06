@@ -1,4 +1,4 @@
-import release,{rows,services,regionLabels} from './support-catalog.mjs';
+import release,{rows,services,regionLabels} from './support-catalog.mjs?v=20261006-housing-scope';
 export const handbookRegions=regionLabels;
 export const handbookNeeds=release.issues.map(issue=>({id:issue.issue_id,title:issue.heading.replace(/^\d+\.\s*/,''),summary:issue.note||''}));
 export const handbookDirectory=rows.map(row=>services[row.appearance_id]);

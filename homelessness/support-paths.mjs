@@ -1,4 +1,4 @@
-import release,{rows,rowsById,serviceView,regionLabels,safeHouseCommunities} from './support-catalog.mjs';
+import release,{rows,rowsById,serviceView,regionLabels,safeHouseCommunities} from './support-catalog.mjs?v=20261006-housing-scope';
 export const regionIds=Object.keys(regionLabels);
 const options=entries=>entries.map(([value,label,detail])=>({value,label,...detail?{detail}:{}}));
 const question=(id,label,entries,hint)=>({id,label,options:options(entries),...hint?{hint}:{}});
@@ -32,7 +32,7 @@ const subquestions={
  'disability-ageing':question('careNeed','What would help?',[['disability','Disability access, advocacy or daily support'],['aged','Finding aged care or daily living help'],['rights','Aged-care rights or advocacy'],['carer','Support for an unpaid carer']]),
  'legal-transition':question('transitionNeed','What is the person leaving?',[['hospital','Hospital'],['custody','Prison or custody'],['care','Out-of-home care'],['temporary','Temporary or supported housing'],['treatment','Alcohol or drug treatment']]),
  'legal-help':question('legalNeed','What is the problem?',[['general','General legal advice'],['housing','NT Housing complaint or appeal'],['discrimination','Discrimination'],['children','Children and Families complaint'],['government','Government / police complaint'],['identity','An LGBTQIASB+ identity-related legal issue'],['violence','Family or sexual-violence legal help'],['women','A women’s or gender-specific legal service']]),
- 'access-culture-disability':question('accessNeed','What would help?',[['language','Interpreting or communication access'],['transport','Transport or local safety patrol'],['settlement','Refugee or migrant settlement support'],['veteran','Veteran or Defence-family navigation']])
+ 'access-culture-disability':question('accessNeed','What would help?',[['language','Interpreting or communication access'],['transport','Transport or local safety patrol'],['settlement','Refugee or migrant settlement support'],['veteran','Housing-service navigation for veterans and families']])
 };
 function needsAge(a){
  if(a.need==='health-wellbeing'||a.need==='alcohol-drugs')return true;
@@ -164,6 +164,9 @@ function rowChoices(a){
  return candidates;
 }
 function resultNote(a){
+ // This guide uses the agency for an audience-specific housing enquiry.
+ // Its original eligibility and wider remit remain in the source card.
+ if(a.need==='access-culture-disability'&&a.accessNeed==='veteran')return 'For veterans and families facing housing difficulties, the agency can help navigate housing services. It is not a crisis service or accommodation provider.';
  const published=issue(needIssues[a.need])?.note||'Published eligibility, fees and catchments apply. No bed, appointment or acceptance has been checked live.';
  if(a.need==='violence-safety')return 'Immediate danger: call 000. '+published;
  if(a.need!=='safe-tonight')return published;
@@ -219,7 +222,8 @@ function buildResult(matched,a,contactMode,note){
   return view;
  });
  const ids=views.map(v=>v.id);
- return {ids:ids.slice(0,3),moreIds:ids.slice(3),allIds:ids,totalMatches:ids.length,noDirectMatch,servicesById:Object.fromEntries(views.map(v=>[v.id,v])),note,noteBefore:['safe-tonight','violence-safety'].includes(a.need),say:'I need help with '+(needTitles[a.need]||'finding a service').toLowerCase()+'. Can you check whether this service fits, the next contact, any costs and what I need to bring?',contextLabel:questionsFor(Object.keys(topicNeeds).find(k=>topicNeeds[k].includes(a.need))||'help',a).flatMap(q=>q.options.filter(o=>o.value===a[q.id]).map(o=>o.label)).join(' · '),preferenceGroups:[],contactMode,coverage:{issueGroups:16,routes:219,sourceCatalogueIds:194,liveAvailabilityChecked:false}};
+ const veteranHousing=a.need==='access-culture-disability'&&a.accessNeed==='veteran';
+ return {ids:ids.slice(0,3),moreIds:ids.slice(3),allIds:ids,totalMatches:ids.length,noDirectMatch,servicesById:Object.fromEntries(views.map(v=>[v.id,v])),note,noteBefore:['safe-tonight','violence-safety'].includes(a.need),say:veteranHousing?'I am a veteran or family member facing housing difficulties. Can you help me find a suitable housing service?':'I need help with '+(needTitles[a.need]||'finding a service').toLowerCase()+'. Can you check whether this service fits, the next contact, any costs and what I need to bring?',contextLabel:veteranHousing?'Housing-service navigation for veterans and families':questionsFor(Object.keys(topicNeeds).find(k=>topicNeeds[k].includes(a.need))||'help',a).flatMap(q=>q.options.filter(o=>o.value===a[q.id]).map(o=>o.label)).join(' · '),preferenceGroups:[],...(veteranHousing?{preferenceLink:{href:'https://www.veteranwellbeing.gov.au/whatwedo',label:'About the agency’s housing navigation'}}:{}),contactMode,coverage:{issueGroups:16,routes:219,sourceCatalogueIds:194,liveAvailabilityChecked:false}};
 }
 export function recoveryResults(handoff,a={}){
  // Re-run the original fit and regional contact logic. Recovery never converts
