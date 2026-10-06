@@ -92,7 +92,7 @@ export function contactOptionsFor(row,{noPhone=false,region=''}={}){
  if(!noPhone&&row.catalogue_id!=='nt-central-intake'){
   const seen=new Set();
   for(const line of d.contact.split('\n')){
-   const matches=line.match(/\b(?:0[2378]\s?\d{4}\s?\d{4}|04\d{2}(?:\s?\d){6}|1800\s?\d{3}\s?\d{3}|1300\s?\d{3}\s?\d{3}|13\s?\d{2}\s?\d{2}|000)\b/g)||[];
+   const matches=line.match(/\b(?:0[2378]\s?\d{4}\s?\d{4}|04\d{2}(?:\s?\d){6}|1800\s?(?:\d{3}\s?\d{3}|\d{2}\s?\d{4})|1300\s?\d{3}\s?\d{3}|13\s?\d{2}\s?\d{2}|000)\b/g)||[];
    for(const phone of matches){
     const digits=phone.replace(/\D/g,''),scope=regionalPhones[row.catalogue_id]?.[digits];
     if(seen.has(digits)||(region&&scope&&!scope.includes(region)))continue;

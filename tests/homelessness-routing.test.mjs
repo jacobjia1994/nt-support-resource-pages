@@ -60,8 +60,14 @@ test('tonight notices retain fit and availability caution for the selected regio
  for(const region of ['darwin','katherine','alice','topend','central','npy','unsure']){
   const r=result('housing',{...answers,region});
   assert.doesNotMatch(r.note,/Barkly|East Arnhem|000/);
-  assert.match(r.note,/vacancies, costs, household\/carer fit, disability access and pets/);
-  assert.match(r.note,/After hours or if full.*none is guaranteed/);
+  if(['darwin','katherine'].includes(region)){
+   assert.match(r.note,/vacancies, costs, household\/carer fit, disability access and pets/);
+   assert.match(r.note,/After hours or if full.*none is guaranteed/);
+  }else{
+   assert.match(r.note,/No matching accommodation route is listed here/);
+   assert.match(r.note,/48 business hours.*not support for tonight/);
+   if(region==='alice')assert.match(r.note,/Foot Patrol.*does not provide or guarantee a bed/);
+  }
  }
  const barkly=result('housing',{...answers,region:'tennant'}).note;
  const arnhem=result('housing',{...answers,region:'arnhem'}).note;
@@ -181,7 +187,16 @@ test('irrelevant age and location questions are skipped; essential fit remains',
  }
  assert(questionsFor('housing',{need:'safe-tonight',region:'darwin'}).some(q=>q.id==='age'));
  assert(questionsFor('housing',{need:'safe-tonight',region:'darwin'}).some(q=>q.id==='household'));
- assert(questionsFor('family',{need:'children-youth-family',familyNeed:'housing'}).some(q=>q.id==='age'));
+ const youthNeed={need:'children-youth-family',familyNeed:'housing'};
+ assert.equal(getFlowState('family',youthNeed).nextQuestion.id,'region');
+ const youthFlow=getFlowState('family',{...youthNeed,region:'darwin'});
+ assert(youthFlow.complete);assert(!youthFlow.questions.some(q=>q.id==='age'));
+ const youthResult=result('family',youthFlow.answers);
+ assert.equal(services[youthResult.ids[0]].catalogueId,'territory-faces');
+ const youthRoute=youthResult.allIds.find(id=>services[id].catalogueId==='anglicare-yhopp');
+ assert.match(youthResult.servicesById[youthRoute].audience,/10.*25/);
+ assert.match(youthResult.servicesById[youthRoute].contactNotice,/Published age limits apply/);
+ assert.equal(getFlowState('access',{need:'legal-transition',transitionNeed:'temporary',region:'darwin'}).nextQuestion.id,'age');
 });
 
 test('adult mental-health contact is ahead of conditional youth programmes',()=>{

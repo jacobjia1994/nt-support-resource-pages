@@ -1,7 +1,10 @@
-import {questionsFor, preferencesFor} from './support-paths.mjs?v=20261006-housing-scope';
+import {questionsFor, preferencesFor} from './support-paths.mjs?v=20261006-continuous-final';
 
 const ntRegions = new Set(['darwin','katherine','alice','tennant','arnhem','topend','central','npy','unsure']);
 const contextRegions = new Set([...ntRegions]);
+// Contact ability remains a remembered choice even when this branch has no
+// alternative non-phone actions and therefore hides the optional control.
+const rememberedPreferences = new Set(['no-phone']);
 const owns = (object, key) => Object.prototype.hasOwnProperty.call(object,key);
 const accepts = (question, value) => question.options.some(option => option.value === value);
 const sameValues = (left, right) => left.length === right.length && left.every((value,index) => value === right[index]);
@@ -44,7 +47,7 @@ export function getFlowState(topic, answers={}, savedRegion='') {
   }
 
   if(Array.isArray(current.preferences)){
-   const valid=new Set(preferencesFor(topic,current).map(preference=>preference.value));
+   const valid=new Set([...rememberedPreferences,...preferencesFor(topic,current).map(preference=>preference.value)]);
    const preferences=[...new Set(current.preferences.filter(value=>valid.has(value)))];
    if(!sameValues(preferences,current.preferences))changed=true;
    current.preferences=preferences;
@@ -62,7 +65,9 @@ export function getFlowState(topic, answers={}, savedRegion='') {
  return {
   answers:current,
   questions,
-  visibleQuestions:complete?questions:questions.slice(0,missing+1),
+  // Retained answered groups stay editable even when an earlier change adds
+  // a missing prerequisite. Keep canonical order so completing it moves no group.
+  visibleQuestions:questions.filter((question,index)=>accepts(question,current[question.id])||index===missing),
   complete,
   nextQuestion:complete?null:questions[missing]
  };
@@ -76,16 +81,14 @@ export function applyAnswer(topic, answers, questionId, value, savedRegion='') {
  if(!question||!accepts(question,value)||flow.answers[questionId]===value)return flow;
 
  const current={...flow.answers};
- const position=flow.questions.findIndex(item=>item.id===questionId);
- const resetFollowing=questionId==='need'||!owns(flow.answers,questionId);
  const changedPatient=topic==='care'&&questionId==='role';
  const localQualifications=new Set(['localCommunity','reliefCommunity','remoteArea','congressFit','wurliClient','community']);
  for(const key of Object.keys(current)){
   if(key===questionId||key==='region'||key==='preferences')continue;
-  const keyPosition=flow.questions.findIndex(item=>item.id===key);
-  if((resetFollowing&&(keyPosition>position||keyPosition===-1))||(changedPatient&&['dvaTravel','ntResidence','dependant'].includes(key))||(questionId==='region'&&localQualifications.has(key)))delete current[key];
+  if((changedPatient&&['dvaTravel','remotePosting','ntResidence','dependant'].includes(key))||(questionId==='region'&&localQualifications.has(key)))delete current[key];
  }
- // Normalisation removes qualifications whose question is no longer relevant.
+ // Relevance and option validity, rather than question order, remove stale
+ // qualifications. Explicit patient/catchment guards above preserve meaning.
  // Independent answers that still mean the same thing stay selected.
  current[questionId]=value;
  return getFlowState(topic,current,savedRegion);
