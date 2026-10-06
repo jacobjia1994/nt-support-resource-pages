@@ -98,7 +98,7 @@ test('authorized Defence compatibility corrections retain the five precise autho
 });
 
 test('authored Defence local links and assets resolve; source actions use safe protocols',()=>{
- const files=defenceFiles();assert.equal(files.length,56);
+ const files=defenceFiles();assert.equal(files.length,57);assert.ok(files.includes('help/legal.html'),'The authored legal help page is included in link and asset checks');
  for(const file of files){const html=read('defence/'+file),ids=new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]));assert.equal(ids.size,[...html.matchAll(/\bid="([^"]+)"/g)].length,file+' has no duplicate element IDs');
   for(const raw of [...hrefs(html),...[...html.matchAll(/\bsrc="([^"]+)"/g)].map(m=>decode(m[1]))]){if(/^(https?:|tel:|sms:|mailto:|data:)/.test(raw))continue;assert.doesNotMatch(raw,/^[a-z]+:/i);const target=new URL(raw,new URL('defence/'+file,base)),hash=target.hash;target.hash='';target.search='';assert.ok(existsSync(target),file+' -> '+raw);if(hash&&hash!=='#home'){const other=readFileSync(target,'utf8');assert.ok(other.includes('id="'+decodeURIComponent(hash.slice(1))+'"'),file+' -> '+raw);}}
  }
